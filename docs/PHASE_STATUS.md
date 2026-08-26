@@ -5,7 +5,7 @@
 * **Phase 2: Microphone + Audio + VAD**
     * **Step 1: Microphone -> 16 kHz PCM capture** - COMPLETE
     * **Step 2: Silero VAD Integration** - COMPLETE (Fixed initialization crash by replacing corrupted model with official Silero VAD v4 ONNX and ensuring no-compress build rules)
-* **Phase 3: Whisper/STT Integration** - NOT STARTED
+* **Phase 3: Whisper/STT Integration** - COMPLETE (Implemented offline English STT using Whisper Tiny int8 ONNX model via sherpa-onnx)
 * **Phase 4: Text Transport (Wi-Fi/Bluetooth)** - NOT STARTED
 * **Phase 5: TTS Integration** - NOT STARTED
 * **Phase 6: Multilingual Support (10 languages)** - NOT STARTED

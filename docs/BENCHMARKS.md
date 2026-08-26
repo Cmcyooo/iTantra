@@ -11,9 +11,14 @@
 * **CPU Usage (Idle/Recording)**: TBD
 * **Memory Footprint (Resident)**: TBD (~2-5 MB for model)
 
-## STT Performance (Future Phase)
-* **Real-time Factor (RTF)**: TBD
-* **Word Error Rate (WER)**: TBD
+## STT Performance (Phase 3)
+* **Model**: Whisper Tiny EN (int8 ONNX)
+* **Total Model Size (Encoder + Decoder)**: ~103 MB
+* **Device**: Samsung Galaxy S24 (SM-S921B)
+* **Android Version**: Android 14 (API 34)
+* **RTF (Real-Time Factor)**: ~0.08 - 0.22 (Verified offline)
+* **Avg Latency (5s audio)**: ~300 - 500ms
+* **Peak RAM during inference**: ~200 - 300 MB (Estimated)
 
 ## Battery Impact
 * **Energy Consumption per hour of active use**: TBD

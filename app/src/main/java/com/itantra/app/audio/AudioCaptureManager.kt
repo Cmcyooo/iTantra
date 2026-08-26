@@ -22,6 +22,9 @@ data class AudioState(
     val durationSeconds: Double = 0.0,
     val rms: Double = 0.0,
     val vadStatus: VadStatus = VadStatus.SILENCE,
+    val sttStatus: SttStatus = SttStatus.IDLE,
+    val recognizedText: String = "",
+    val lastSttResult: SttResult? = null,
     val errorMessage: String? = null
 )
 
@@ -45,6 +48,11 @@ class AudioCaptureManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     private var vadManager: VadManager? = null
+    private var sttManager: SttManager? = null
+
+    // Accumulates audio samples during active speech
+    private val speechAccumulator = mutableListOf<FloatArray>()
+    private var speechSamplesCount = 0
 
     // Standard 16 kHz, Mono, 16-bit PCM configuration
     val sampleRate = 16000
@@ -79,6 +87,11 @@ class AudioCaptureManager(private val context: Context) {
             vadManager = VadManager(context)
         } else {
             vadManager?.reset()
+        }
+
+        // Initialize STT if not already done
+        if (sttManager == null) {
+            sttManager = SttManager(context)
         }
 
         val minBufferSizeInBytes = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
@@ -165,10 +178,19 @@ class AudioCaptureManager(private val context: Context) {
                         Log.d(TAG, "First samples: ${buffer.take(10).joinToString()}, RMS: $latestRms")
                     }
                     
+                    // Convert PCM16 chunk to Float for accumulation
+                    val floatChunk = FloatArray(readCount)
+                    for (i in 0 until readCount) {
+                        floatChunk[i] = buffer[i] / 32768.0f
+                    }
+
                     // Process VAD
                     val currentVadStatus = vadManager?.process(
                         if (readCount == buffer.size) buffer else buffer.copyOfRange(0, readCount)
                     ) ?: VadStatus.SILENCE
+
+                    // Handle speech accumulation and STT triggering
+                    handleSpeechTransitions(currentVadStatus, floatChunk)
 
                     if (currentVadStatus != _state.value.vadStatus) {
                         Log.d(TAG, "VAD Status Changed: $currentVadStatus")
@@ -261,12 +283,77 @@ class AudioCaptureManager(private val context: Context) {
     }
 
     /**
+     * Handles accumulation of audio during speech and triggers STT when speech ends.
+     */
+    private fun handleSpeechTransitions(vadStatus: VadStatus, floatChunk: FloatArray) {
+        when (vadStatus) {
+            VadStatus.SPEECH_DETECTED, VadStatus.SPEAKING -> {
+                // Limit to 30 seconds to prevent OOM
+                if (speechSamplesCount < sampleRate * 30) {
+                    speechAccumulator.add(floatChunk.copyOf())
+                    speechSamplesCount += floatChunk.size
+                    
+                    if (_state.value.sttStatus != SttStatus.SPEECH_DETECTED) {
+                        _state.value = _state.value.copy(sttStatus = SttStatus.SPEECH_DETECTED)
+                    }
+                }
+            }
+            VadStatus.SPEECH_ENDED -> {
+                if (speechAccumulator.isNotEmpty()) {
+                    val speechData = flattenAccumulator()
+                    speechAccumulator.clear()
+                    speechSamplesCount = 0
+                    
+                    // Trigger STT in background
+                    runStt(speechData)
+                }
+            }
+            VadStatus.SILENCE -> {
+                if (_state.value.sttStatus != SttStatus.IDLE && _state.value.sttStatus != SttStatus.COMPLETE) {
+                    // Reset to idle if we were expecting speech but got silence
+                    _state.value = _state.value.copy(sttStatus = SttStatus.IDLE)
+                }
+            }
+        }
+    }
+
+    private fun flattenAccumulator(): FloatArray {
+        val result = FloatArray(speechSamplesCount)
+        var offset = 0
+        for (chunk in speechAccumulator) {
+            chunk.copyInto(result, offset)
+            offset += chunk.size
+        }
+        return result
+    }
+
+    private fun runStt(samples: FloatArray) {
+        scope.launch {
+            _state.value = _state.value.copy(sttStatus = SttStatus.TRANSCRIBING)
+            
+            val result = sttManager?.transcribe(samples)
+            
+            if (result != null) {
+                _state.value = _state.value.copy(
+                    sttStatus = SttStatus.COMPLETE,
+                    recognizedText = result.text,
+                    lastSttResult = result
+                )
+            } else {
+                _state.value = _state.value.copy(sttStatus = SttStatus.ERROR)
+            }
+        }
+    }
+
+    /**
      * Releases all resources when the manager is destroyed.
      */
     fun release() {
         stopRecording()
         vadManager?.release()
+        sttManager?.release()
         vadManager = null
+        sttManager = null
         scope.cancel()
     }
 }

@@ -106,6 +106,44 @@ fun MicrophoneTestScreen(audioManager: AudioCaptureManager) {
                     label = "Audio Level (RMS):", 
                     value = "%.0f".format(audioState.rms)
                 )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                StatusItem(
+                    label = "STT Status:",
+                    value = audioState.sttStatus.name,
+                    valueColor = when (audioState.sttStatus) {
+                        com.itantra.app.audio.SttStatus.IDLE -> MaterialTheme.colorScheme.secondary
+                        com.itantra.app.audio.SttStatus.SPEECH_DETECTED -> MaterialTheme.colorScheme.primary
+                        com.itantra.app.audio.SttStatus.TRANSCRIBING -> MaterialTheme.colorScheme.tertiary
+                        com.itantra.app.audio.SttStatus.COMPLETE -> MaterialTheme.colorScheme.primary
+                        com.itantra.app.audio.SttStatus.ERROR -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+
+                if (audioState.recognizedText.isNotEmpty()) {
+                    Text(
+                        text = "Recognized Text:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    Text(
+                        text = audioState.recognizedText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                audioState.lastSttResult?.let { res ->
+                    Text(
+                        text = "Last Inference: Proc: ${res.processingTimeMs}ms, RTF: ${"%.3f".format(res.rtf)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
