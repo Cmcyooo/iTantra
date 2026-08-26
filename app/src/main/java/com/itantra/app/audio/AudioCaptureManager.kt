@@ -178,16 +178,14 @@ class AudioCaptureManager(private val context: Context) {
                         Log.d(TAG, "First samples: ${buffer.take(10).joinToString()}, RMS: $latestRms")
                     }
                     
-                    // Convert PCM16 chunk to Float for accumulation
+                    // Convert PCM16 chunk to Float for accumulation - Reuse buffer if possible
                     val floatChunk = FloatArray(readCount)
                     for (i in 0 until readCount) {
                         floatChunk[i] = buffer[i] / 32768.0f
                     }
 
-                    // Process VAD
-                    val currentVadStatus = vadManager?.process(
-                        if (readCount == buffer.size) buffer else buffer.copyOfRange(0, readCount)
-                    ) ?: VadStatus.SILENCE
+                    // Process VAD with the float chunk we just converted
+                    val currentVadStatus = vadManager?.process(floatChunk) ?: VadStatus.SILENCE
 
                     // Handle speech accumulation and STT triggering
                     handleSpeechTransitions(currentVadStatus, floatChunk)
@@ -235,12 +233,22 @@ class AudioCaptureManager(private val context: Context) {
 
     /**
      * Stops recording and releases AudioRecord resources.
+     * @param forceFinalize If true, immediately triggers STT with whatever speech was accumulated.
      */
     @Synchronized
-    fun stopRecording() {
+    fun stopRecording(forceFinalize: Boolean = false) {
         if (!_state.value.isRecording && audioRecord == null) return
 
+        Log.d(TAG, "stopRecording(forceFinalize=$forceFinalize)")
         _state.value = _state.value.copy(isRecording = false)
+        
+        if (forceFinalize && speechAccumulator.isNotEmpty()) {
+            val speechData = flattenAccumulator()
+            speechAccumulator.clear()
+            speechSamplesCount = 0
+            runStt(speechData)
+        }
+
         recordingJob?.cancel()
         recordingJob = null
 

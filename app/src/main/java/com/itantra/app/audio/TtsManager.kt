@@ -77,7 +77,7 @@ class TtsManager(private val context: Context) {
 
                 val modelConfig = OfflineTtsModelConfig(
                     vits = vitsConfig,
-                    numThreads = 1,
+                    numThreads = 2, // Increased from 1 to 2
                     debug = false,
                     provider = "cpu"
                 )

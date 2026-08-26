@@ -58,7 +58,7 @@ class SttManager(private val context: Context) {
             val modelConfig = OfflineModelConfig(
                 whisper = whisperConfig,
                 tokens = tokensFile.absolutePath,
-                numThreads = 1,
+                numThreads = 2, // Increased from 1 to 2 for faster inference on multi-core devices
                 debug = false,
                 provider = "cpu",
                 modelType = "whisper"

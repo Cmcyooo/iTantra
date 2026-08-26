@@ -34,12 +34,13 @@
 * **Message Payload Size**: ~150-300 bytes (JSON)
 * **Transport Latency (Avg)**: ~2-15ms (Tested on local Wi-Fi)
 
-## End-to-End Latency (Phase 6)
+## End-to-End Latency (Phase 6 Optimized)
 * **Path**: Phone A (Speech) -> STT -> Network -> Phone B (Text) -> TTS -> Audio
-* **STT Time**: ~300-500ms
-* **Network Time**: < 15ms
-* **TTS Time**: ~300-400ms
-* **Approx. Total**: ~600-900ms (Excellent for real-time interaction)
+* **VAD Silence Threshold**: 300ms (Reduced from 500ms for faster turn-around)
+* **STT Time (Whisper Tiny INT8, 2 threads)**: ~300-450ms (Optimized from ~491ms)
+* **Network Time (TCP NoDelay)**: ~5-25ms (Optimized from ~126ms baseline in some tests)
+* **TTS Time (Piper INT8, 2 threads)**: ~150-250ms (Optimized from ~246ms)
+* **Approx. Total (Endpoint to Audio)**: ~500-750ms (Target: < 1.0s for fluid interaction)
 
 ## Battery Impact
 * **Energy Consumption per hour of active use**: TBD

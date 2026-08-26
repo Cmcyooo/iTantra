@@ -191,14 +191,20 @@ fun PTTSection(
                 TransceiverState.LISTENING -> "LISTENING..."
                 TransceiverState.SPEAKING -> "SPEAKING..."
                 TransceiverState.TRANSCRIBING -> "TRANSCRIBING..."
-                TransceiverState.SENDING -> "SENDING..."
+                TransceiverState.FORWARDING -> "FORWARDING..."
+                TransceiverState.SENT -> "SENT ✅"
                 TransceiverState.RECEIVING -> "RECEIVING..."
                 TransceiverState.PLAYING -> "🔊 PLAYING"
                 TransceiverState.ERROR -> "ERROR"
             },
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
-            color = if (isPressed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            color = when(state) {
+                TransceiverState.LISTENING, TransceiverState.SPEAKING -> MaterialTheme.colorScheme.error
+                TransceiverState.TRANSCRIBING, TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
+                TransceiverState.SENT -> Color(0xFF4CAF50)
+                else -> MaterialTheme.colorScheme.primary
+            }
         )
         
         Spacer(modifier = Modifier.height(24.dp))

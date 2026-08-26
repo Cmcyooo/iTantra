@@ -71,17 +71,21 @@ class WiFiTransport : Transport {
         
         val socket = serverSocket?.accept()
         if (socket != null) {
+            socket.tcpNoDelay = true
             setupConnection(socket)
         }
     }
 
     private suspend fun startClient(ip: String) = withContext(Dispatchers.IO) {
         Log.d(TAG, "Connecting to $ip:$PORT...")
-        val socket = Socket(ip, PORT)
+        val socket = Socket(ip, PORT).apply {
+            tcpNoDelay = true // Disable Nagle's algorithm for lower latency
+        }
         setupConnection(socket)
     }
 
     private fun setupConnection(socket: Socket) {
+        socket.tcpNoDelay = true
         clientSocket = socket
         writer = PrintWriter(socket.getOutputStream(), true)
         _connectionState.value = ConnectionState.CONNECTED

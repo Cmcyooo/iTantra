@@ -46,12 +46,12 @@ class VadManager(context: Context) {
             
             Log.i(TAG, "Model copied to: ${modelFile.absolutePath}, size: ${modelFile.length()} bytes")
 
-            // Configure Silero VAD using the absolute path of the copied model
+            // Configure Silero VAD with slightly more aggressive endpointing
             val sileroConfig = SileroVadModelConfig(
                 modelFile.absolutePath,
-                0.5f,
-                0.5f,
-                0.25f,
+                0.5f,  // threshold
+                0.5f,  // minSpeechDuration
+                0.3f,  // minSilenceDuration (Reduced from 0.5s to 0.3s for faster turn-around)
                 windowSize
             )
             
@@ -82,18 +82,12 @@ class VadManager(context: Context) {
     }
 
     /**
-     * Processes a chunk of PCM16 samples.
+     * Processes a chunk of normalized Float PCM samples.
      * Returns the updated VadStatus.
      */
-    fun process(pcmData: ShortArray): VadStatus {
+    fun process(floatData: FloatArray): VadStatus {
         val vad = vad ?: return VadStatus.SILENCE
         
-        // Convert PCM16 ShortArray to FloatArray normalized to [-1.0, 1.0]
-        val floatData = FloatArray(pcmData.size)
-        for (i in pcmData.indices) {
-            floatData[i] = pcmData[i] / 32768.0f
-        }
-
         // Push audio to detector
         vad.acceptWaveform(floatData)
 

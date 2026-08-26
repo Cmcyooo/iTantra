@@ -26,6 +26,11 @@
 * **Local TCP Sockets**: Chosen for Phase 5 to enable reliable, server-less communication on a local Wi-Fi or Hotspot network. Simple socket logic avoids heavy frameworks and works on all Android versions.
 * **Host/Client Roles**: To simplify connection without complex discovery (NSD), one device acts as Host (Server) and the other as Client (requires manual IP entry).
 * **Message Model**: JSON-serialized `P2PMessage` containing ID, timestamp, language, and text.
+* **TCP Optimization**: Enabled `TCP_NODELAY` on both client and server sockets to bypass Nagle's algorithm, reducing small-packet latency for real-time text transport.
+
+## Inference Optimization
+* **Multi-threading**: Increased `numThreads` from 1 to 2 for both Whisper STT and Piper TTS. This provides a significant speedup on multi-core mid-range devices while remaining safe for quad-core low-end devices.
+* **VAD Endpointing**: Reduced `minSilenceDuration` to 300ms. This offers a more responsive "walkie-talkie" feel without cutting off natural speech trailing.
 
 ## Native Model Loading
 * **Asset Compression**: Disabled compression for `.onnx` files in `app/build.gradle.kts` using `androidResources.noCompress`. This is critical as ONNX Runtime needs to memory-map the model file directly from the APK assets, which fails if the file is compressed (deflated).

@@ -15,7 +15,8 @@ enum class TransceiverState {
     LISTENING,
     SPEAKING,
     TRANSCRIBING,
-    SENDING,
+    FORWARDING,
+    SENT,
     RECEIVING,
     PLAYING,
     ERROR
@@ -38,6 +39,8 @@ class TransceiverManager(
     
     private var lastSentText: String = ""
     private var lastReceivedText: String = ""
+    
+    private var pttReleaseTime: Long = 0
 
     companion object {
         private const val TAG = "TransceiverManager"
@@ -62,14 +65,19 @@ class TransceiverManager(
         commManager.setOnMessageReceivedListener { message: P2PMessage ->
             handleIncomingMessage(message)
         }
-        
-        // Observe Network state for receiving/sending indicators
-        // (Simple implementation: just rely on the above for now)
     }
 
     private fun updateStateFromAudio(state: AudioState) {
         when {
-            state.sttStatus == SttStatus.TRANSCRIBING -> _uiState.value = TransceiverState.TRANSCRIBING
+            state.sttStatus == SttStatus.TRANSCRIBING -> {
+                if (_uiState.value != TransceiverState.TRANSCRIBING) {
+                    val sttStartTime = System.currentTimeMillis()
+                    if (pttReleaseTime > 0) {
+                        Log.d(TAG, "Latency: PTT Release -> STT Start: ${sttStartTime - pttReleaseTime}ms")
+                    }
+                    _uiState.value = TransceiverState.TRANSCRIBING
+                }
+            }
             state.sttStatus == SttStatus.COMPLETE && state.recognizedText.isNotEmpty() -> {
                 if (state.recognizedText != lastSentText) {
                     lastSentText = state.recognizedText
@@ -81,7 +89,8 @@ class TransceiverManager(
             state.isRecording -> _uiState.value = TransceiverState.LISTENING
             _uiState.value != TransceiverState.PLAYING && 
             _uiState.value != TransceiverState.RECEIVING &&
-            _uiState.value != TransceiverState.SENDING -> 
+            _uiState.value != TransceiverState.FORWARDING &&
+            _uiState.value != TransceiverState.SENT -> 
                 _uiState.value = TransceiverState.IDLE
         }
     }
@@ -90,7 +99,14 @@ class TransceiverManager(
         when (status) {
             TtsStatus.SYNTHESIZING -> _uiState.value = TransceiverState.RECEIVING
             TtsStatus.PLAYING -> _uiState.value = TransceiverState.PLAYING
-            TtsStatus.COMPLETE -> _uiState.value = TransceiverState.IDLE
+            TtsStatus.COMPLETE -> {
+                scope.launch {
+                    delay(1000.milliseconds)
+                    if (_uiState.value == TransceiverState.PLAYING || _uiState.value == TransceiverState.RECEIVING) {
+                        _uiState.value = TransceiverState.IDLE
+                    }
+                }
+            }
             TtsStatus.ERROR -> _uiState.value = TransceiverState.ERROR
             else -> {}
         }
@@ -98,10 +114,15 @@ class TransceiverManager(
 
     private fun sendRecognizedText(text: String) {
         scope.launch {
-            _uiState.value = TransceiverState.SENDING
+            val sendStartTime = System.currentTimeMillis()
+            _uiState.value = TransceiverState.FORWARDING
             commManager.sendText(text)
-            delay(500.milliseconds) // Visual feedback for "Sending"
-            if (_uiState.value == TransceiverState.SENDING) {
+            val sendEndTime = System.currentTimeMillis()
+            Log.d(TAG, "Latency: STT End -> Network Send: ${sendEndTime - sendStartTime}ms")
+            
+            _uiState.value = TransceiverState.SENT
+            delay(1500.milliseconds) // Show "SENT" for a bit
+            if (_uiState.value == TransceiverState.SENT) {
                 _uiState.value = TransceiverState.IDLE
             }
         }
@@ -109,7 +130,10 @@ class TransceiverManager(
 
     private fun handleIncomingMessage(message: P2PMessage) {
         scope.launch {
-            Log.d(TAG, "Incoming P2P message: ${message.text}")
+            val receiveTime = System.currentTimeMillis()
+            val transportLatency = receiveTime - message.timestamp
+            Log.d(TAG, "Incoming P2P message: ${message.text}. Network Latency: ${transportLatency}ms")
+            
             lastReceivedText = message.text
             _uiState.value = TransceiverState.RECEIVING
             ttsManager.speak(message.text)
@@ -120,6 +144,7 @@ class TransceiverManager(
      * Start Push-to-Talk.
      */
     fun startTalk() {
+        pttReleaseTime = 0
         audioManager.startRecording()
     }
 
@@ -127,7 +152,8 @@ class TransceiverManager(
      * Release Push-to-Talk.
      */
     fun stopTalk() {
-        audioManager.stopRecording()
+        pttReleaseTime = System.currentTimeMillis()
+        audioManager.stopRecording(forceFinalize = true)
     }
 
     fun release() {
