@@ -14,19 +14,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.core.content.ContextCompat
-import com.itantra.app.audio.AudioCaptureManager
+import com.itantra.app.audio.*
 
 /**
- * A simple test screen for microphone capture.
+ * A simple test screen for microphone capture and TTS.
  * Displays real-time stats and handles permissions.
  */
 @Composable
-fun MicrophoneTestScreen(audioManager: AudioCaptureManager) {
+fun MicrophoneTestScreen(
+    audioManager: AudioCaptureManager,
+    ttsManager: TtsManager
+) {
     val context = LocalContext.current
     val audioState by audioManager.state.collectAsState()
+    val ttsStatus by ttsManager.status.collectAsState()
+    val ttsResult by ttsManager.lastResult.collectAsState()
     
-    // Track permission state locally
+    var ttsText by remember { mutableStateOf("Hello, this is iTantra.") }
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -43,12 +50,15 @@ fun MicrophoneTestScreen(audioManager: AudioCaptureManager) {
         hasPermission = isGranted
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         Text(
             text = "iTantra",
@@ -85,10 +95,10 @@ fun MicrophoneTestScreen(audioManager: AudioCaptureManager) {
                     label = "VAD Status:",
                     value = audioState.vadStatus.name,
                     valueColor = when (audioState.vadStatus) {
-                        com.itantra.app.audio.VadStatus.SILENCE -> MaterialTheme.colorScheme.secondary
-                        com.itantra.app.audio.VadStatus.SPEECH_DETECTED, 
-                        com.itantra.app.audio.VadStatus.SPEAKING -> MaterialTheme.colorScheme.primary
-                        com.itantra.app.audio.VadStatus.SPEECH_ENDED -> MaterialTheme.colorScheme.tertiary
+                        VadStatus.SILENCE -> MaterialTheme.colorScheme.secondary
+                        VadStatus.SPEECH_DETECTED, 
+                        VadStatus.SPEAKING -> MaterialTheme.colorScheme.primary
+                        VadStatus.SPEECH_ENDED -> MaterialTheme.colorScheme.tertiary
                     }
                 )
                 
@@ -182,6 +192,79 @@ fun MicrophoneTestScreen(audioManager: AudioCaptureManager) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        Text(
+            text = "Text-to-Speech Test",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        OutlinedTextField(
+            value = ttsText,
+            onValueChange = { ttsText = it },
+            label = { Text("Text to Speak") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                StatusItem(
+                    label = "TTS Status:",
+                    value = ttsStatus.name,
+                    valueColor = when (ttsStatus) {
+                        TtsStatus.IDLE -> MaterialTheme.colorScheme.secondary
+                        TtsStatus.LOADING -> MaterialTheme.colorScheme.tertiary
+                        TtsStatus.SYNTHESIZING -> MaterialTheme.colorScheme.primary
+                        TtsStatus.PLAYING -> MaterialTheme.colorScheme.primary
+                        TtsStatus.COMPLETE -> MaterialTheme.colorScheme.secondary
+                        TtsStatus.ERROR -> MaterialTheme.colorScheme.error
+                    }
+                )
+
+                ttsResult?.let { res ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    StatusItem(label = "Synthesis Time:", value = "${res.synthesisTimeMs} ms")
+                    StatusItem(label = "Audio Duration:", value = "%.2f s".format(res.audioDuration))
+                    StatusItem(label = "RTF:", value = "%.3f".format(res.rtf))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = { ttsManager.speak(ttsText) },
+                modifier = Modifier.weight(1f),
+                enabled = ttsStatus != TtsStatus.LOADING && ttsStatus != TtsStatus.SYNTHESIZING
+            ) {
+                Text("🔊 SPEAK")
+            }
+            Button(
+                onClick = { ttsManager.stop() },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                enabled = ttsStatus == TtsStatus.PLAYING
+            ) {
+                Text("■ STOP")
+            }
+        }
     }
 }
 

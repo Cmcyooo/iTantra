@@ -20,5 +20,14 @@
 * **Avg Latency (5s audio)**: ~300 - 500ms
 * **Peak RAM during inference**: ~200 - 300 MB (Estimated)
 
+## TTS Performance (Phase 4)
+* **Model**: VITS Piper en_US-amy-low (ONNX)
+* **Model Size**: ~63 MB
+* **Device**: Samsung Galaxy S24 (SM-S921B)
+* **Android Version**: Android 14 (API 34)
+* **RTF (Real-Time Factor)**: ~0.150 (Verified offline)
+* **First-audio Latency**: ~300ms (for ~2s audio)
+* **Synthesis Time (Short)**: ~300ms
+
 ## Battery Impact
 * **Energy Consumption per hour of active use**: TBD
