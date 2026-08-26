@@ -1,9 +1,7 @@
 package com.itantra.app.comm
 
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +12,9 @@ import java.util.UUID
  * Manages peer-to-peer communication.
  * Acts as a facade for different transport implementations.
  */
-class CommunicationManager(private val transport: Transport) {
+class CommunicationManager(initialTransport: Transport) {
+    private var _transport = initialTransport
+    
     private val _messages = MutableStateFlow<List<P2PMessage>>(emptyList())
     val messages: StateFlow<List<P2PMessage>> = _messages.asStateFlow()
 
@@ -24,38 +24,75 @@ class CommunicationManager(private val transport: Transport) {
     private val _latency = MutableStateFlow<Long?>(null)
     val latency: StateFlow<Long?> = _latency.asStateFlow()
 
-    val connectionState: StateFlow<ConnectionState> = transport.connectionState
-    val lastError: StateFlow<String?> = transport.lastError
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
     private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var externalListener: ((P2PMessage) -> Unit)? = null
+    
+    private var transportJob: Job? = null
 
     companion object {
         private const val TAG = "CommunicationManager"
     }
 
     init {
-        transport.setOnMessageReceivedListener { message ->
-            handleReceivedMessage(message)
+        observeTransport(_transport)
+    }
+
+    fun setTransport(newTransport: Transport) {
+        if (_transport == newTransport) return
+        
+        _transport.disconnect()
+        transportJob?.cancel()
+        
+        _transport = newTransport
+        observeTransport(_transport)
+        
+        Log.i(TAG, "Switched transport to: ${newTransport::class.java.simpleName}")
+    }
+
+    private fun observeTransport(transport: Transport) {
+        transportJob?.cancel()
+        transportJob = managerScope.launch {
+            launch {
+                transport.connectionState.collect { state ->
+                    _connectionState.value = state
+                }
+            }
+            launch {
+                transport.lastError.collect { error ->
+                    _lastError.value = error
+                }
+            }
+            transport.setOnMessageReceivedListener { message ->
+                handleReceivedMessage(message)
+            }
         }
     }
 
     fun connect(targetAddress: String? = null) {
-        transport.connect(targetAddress)
+        _transport.connect(targetAddress)
     }
 
     fun disconnect() {
-        transport.disconnect()
+        _transport.disconnect()
     }
 
-    fun sendText(text: String, language: String = "en") {
+    fun getConnectedPeerId(): String? = _transport.getConnectedPeerId()
+
+    fun sendText(text: String, language: String = "en", senderName: String? = null) {
         val message = P2PMessage(
             messageId = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
             language = language,
-            text = text
+            text = text,
+            senderName = senderName
         )
-        transport.sendMessage(message)
+        _transport.sendMessage(message)
         
         // Add local message to list for UI
         addMessageToList(message)

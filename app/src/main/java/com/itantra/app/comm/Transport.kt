@@ -36,6 +36,11 @@ interface Transport {
     fun sendMessage(message: P2PMessage)
 
     /**
+     * Get the identifier of the connected peer (e.g. IP or MAC address).
+     */
+    fun getConnectedPeerId(): String?
+
+    /**
      * Set a callback for received messages.
      */
     fun setOnMessageReceivedListener(callback: (P2PMessage) -> Unit)

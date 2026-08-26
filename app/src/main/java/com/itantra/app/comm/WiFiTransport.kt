@@ -119,6 +119,8 @@ class WiFiTransport : Transport {
         }
     }
 
+    override fun getConnectedPeerId(): String? = clientSocket?.inetAddress?.hostAddress
+
     override fun sendMessage(message: P2PMessage) {
         transportScope.launch {
             try {

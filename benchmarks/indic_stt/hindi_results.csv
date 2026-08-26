@@ -1,0 +1,3 @@
+Model,Architecture,Params,Model Size (INT8),WER (%),CER (%),Avg STT (ms),RTF,RAM (MB),Classification
+Whisper Tiny Multilingual INT8 (sherpa-onnx),Whisper (Autoregressive Seq2Seq),39.0M,98.81 MB,123.7,107.7,1183.7,0.101,1132.8,FAILED (Hallucination)
+Vakyansh Wav2Vec2-Hindi-Him-4200,Wav2Vec2 Base CTC,94.4M,90.0 MB,18.9,5.4,875.2,0.075,1288.2,PRIMARY MOBILE CANDIDATE

@@ -24,9 +24,15 @@
 
 ## Text Transport
 * **Local TCP Sockets**: Chosen for Phase 5 to enable reliable, server-less communication on a local Wi-Fi or Hotspot network. Simple socket logic avoids heavy frameworks and works on all Android versions.
-* **Host/Client Roles**: To simplify connection without complex discovery (NSD), one device acts as Host (Server) and the other as Client (requires manual IP entry).
-* **Message Model**: JSON-serialized `P2PMessage` containing ID, timestamp, language, and text.
-* **TCP Optimization**: Enabled `TCP_NODELAY` on both client and server sockets to bypass Nagle's algorithm, reducing small-packet latency for real-time text transport.
+* **Bluetooth Classic (RFCOMM)**: Chosen for Phase 8.2 for nearby 1-to-1 communication. RFCOMM provides a reliable, stream-oriented transport similar to TCP sockets, simplifying the implementation of a shared text-based protocol.
+* **Name-based Filtering**: For the prototype, Bluetooth discovery filters devices by checking if the name contains "iTantra". This avoids the overhead of service record scanning during discovery.
+* **Line-based Framing**: Both Wi-Fi and Bluetooth transports use JSON-serialized messages followed by a newline. This allows the use of `BufferedReader.readLine()` and `PrintWriter.println()` for robust message framing.
+
+## Bluetooth Identity
+* **iTantra Call Sign**: A user-defined friendly name (e.g., "Station Alpha") stored locally in `SharedPreferences`.
+* **Identity Exchange**: Upon establishing a Bluetooth connection, devices automatically exchange their call signs using a compact JSON message.
+* **Persistent Mapping**: Discovered devices are mapped to their last-known call sign based on their MAC address. This allows the discovery UI to show friendly names even before a connection is fully established (if the peer was seen before).
+* **Naming Fallback**: If no call sign is known, the UI uses the system Bluetooth name. If that is also unavailable (common during early discovery), it displays "iTantra Device" instead of "Unknown device" or raw MAC addresses.
 
 ## Inference Optimization
 * **Multi-threading**: Increased `numThreads` from 1 to 2 for both Whisper STT and Piper TTS. This provides a significant speedup on multi-core mid-range devices while remaining safe for quad-core low-end devices.
@@ -38,3 +44,112 @@
 * **Safe Initialization**: Added `try-catch` blocks around VAD initialization in `VadManager` to prevent app-wide crashes if the native layer fails to load the model (e.g., due to corrupted protobuf parsing), providing better diagnostic information in Logcat.
 * **Min SDK 24**: Targets Android 7.0+ to cover a wide range of devices.
 * **CPU-only Inference**: Ensures functionality on devices without high-end GPUs or NPUs.
+
+## Multilingual STT Model Selection (Phase 7.1)
+* **Whisper Tiny Multilingual INT8 Evaluation**: Evaluated across 10 target Indian languages on Google FLEURS test dataset using sherpa-onnx CPU runtime.
+* **Findings (Option C)**:
+    * Footprint (~98.8 MB) and latency (RTF ~0.08–0.13, ~700–1400ms) are well within the 4–6 GB Android device envelope.
+    * English recognition is high quality (WER 34.7%, CER 12.8%).
+    * Indic languages suffer catastrophic failure (WER > 100%) due to severe hallucinations, repetitive token loops, phonetic Latin transliteration, and absence of Odia (`or`) token in OpenAI Whisper's 99-language vocabulary.
+* **Architectural Decision**: Stock Whisper Tiny Multilingual INT8 cannot be deployed directly as the universal Indic ASR engine.
+
+## Mobile Indic STT Architecture Decision (Phase 7.2)
+* **Model Family Audit & Benchmark (Hindi Focus)**: Audited AI4Bharat IndicConformer, IndicWav2Vec, and Vakyansh Wav2Vec2 CTC families. Benchmarked `Harveenchadha/vakyansh-wav2vec2-hindi-him-4200` (Wav2Vec2-Base CTC, 95M params, MIT) against Whisper Tiny on Google FLEURS Hindi test set.
+* **Key Findings**:
+    * Vakyansh Wav2Vec2 CTC achieved **18.9% WER** and **5.4% CER** on Hindi (a 104.8% absolute WER improvement over Whisper Tiny's 123.7%).
+    * **Non-autoregressive CTC** completely eliminates hallucination and token repetition loops.
+    * Real-Time Factor is **0.075** (~875ms on CPU) and estimated INT8 ONNX footprint is **~94.5 MB**.
+* **Architectural Decision (Option A)**:
+    * Adopt **non-autoregressive CTC / Transducer architectures** (Wav2Vec2-Base / Conformer-CTC / Zipformer) as the primary mobile Indic STT strategy for iTantra.
+    * 600M parameter models (e.g. IndicConformer 600M) are designated as **Accuracy Reference Only** due to CPU/RAM constraints on 4–6 GB mobile devices.
+
+## Android Indic STT Runtime Compatibility (Phase 7.2b & 7.2c)
+* **Exact Artifact**: `vakyansh_hindi_base.int8.onnx` (117.03 MB, SHA-256: `8e24e70119b8559d6299f68ae935be9999b93c1ea63f9d5c2191f902419aa516`).
+* **Input/Output Signature**: Single input tensor `input_values` (dynamic `[1, sequence_length]`) -> Single output tensor `logits` (`[1, T, 67]`).
+* **Physical Device Validation (Samsung Galaxy S24 / SM-S921B)**:
+    * Tested on actual hardware via Android instrumented test suite.
+    * Model load time: **502.36 ms** (direct ONNX mmap).
+    * Average inference latency: **1849.2 ms** for 11.74s audio (**RTF: 0.158**).
+    * Model resident memory delta: **354.84 MB PSS** (within 4–6 GB mobile RAM budget).
+    * On-device accuracy: **17.35% WER** and **5.41% CER**.
+    * Repeated stability: 10 consecutive passes with **zero memory leaks** (delta < 4.5 MB) and **zero crashes**.
+* **Classification**: **MOBILE CANDIDATE** (meets accuracy, speed, and memory constraints for mobile walkie-talkie).
+* **sherpa-onnx vs ONNX Runtime**:
+    * `sherpa-onnx` native C++ layer does not support HuggingFace `Wav2Vec2ForCTC`.
+    * Integration requires either generic ONNX Runtime Android (`ai.onnxruntime:onnxruntime-android`) or exporting Indic Conformer models to NeMo CTC format (`OfflineNemoEncDecCtcModelConfig`).
+
+## Gujarati Mobile STT Candidate Selection (Phase 7.3)
+* **Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-gujarati-gnm-100` (Wav2Vec2-Base CTC, 94.4M params, MIT) as the primary Gujarati mobile STT candidate.
+* **Exact Artifact**: `vakyansh_gujarati_base.int8.onnx` (117.03 MB, SHA-256: `bc64cb802a7dc162f38f3cec4d6a09536d2820ca87c50af370ff3d18d07bd71a`).
+* **Physical Device Validation (Samsung Galaxy S24 / SM-S921B)**:
+    * Cold load time: **485.84 ms**.
+    * Average inference latency: **2231.55 ms** for 10.36s speech (**RTF: 0.215**).
+    * Model resident memory delta: **357.82 MB PSS** (Peak process PSS: **898.91 MB**).
+    * On-device accuracy: **31.06% WER** and **8.61% CER** (vs Whisper Tiny's 117.4% WER).
+    * Stability: 10 repeated passes with **zero memory leaks** (delta < 6.0 MB) and **zero crashes**.
+* **Classification**: **MOBILE CANDIDATE**.
+
+## Marathi Mobile STT Candidate Selection (Phase 7.4)
+* **Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-marathi-mrm-100` (Wav2Vec2-Base CTC, 94.4M params, MIT) as the candidate Marathi mobile STT model.
+* **Exact Artifact**: `vakyansh_marathi_base.int8.onnx` (117.03 MB, SHA-256: `2c503bc31cc60d1d25a407eb4776f121cd5af9952fc96f1dd14afbfce7fd3db9`).
+* **Physical Device Validation (Samsung Galaxy S24 / SM-S921B)**:
+    * Cold load time: **858.28 ms**.
+    * Average inference latency: **3346.20 ms** for 11.61s speech (**RTF: 0.288**).
+    * Model resident memory delta: **338.57 MB PSS** (Peak process PSS: **868.00 MB**).
+    * On-device accuracy: **61.58% WER** and **20.22% CER** (vs Whisper Tiny's 155.2% WER with broken Latin loops).
+    * Stability: 10 repeated passes with **zero memory leaks** (delta < 1.5 MB) and **zero crashes**.
+* **Classification**: **CONDITIONAL CANDIDATE** (recommended for deployment with domain keyword boosting or paired with IndicConformer 120M for higher accuracy).
+
+## Malayalam & Tamil Mobile STT Candidate Selection (Phase 7.5)
+* **Malayalam Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-malayalam-mlm-8` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_malayalam_base.int8.onnx` (117.03 MB, SHA-256: `c0922d209f67461c740784770c2c53ec6160d69c25b1d8c912eee692b8b2eea6`).
+    * On-device measurements: **818.78 ms** load time, **4618.6 ms** avg latency for 14.26s audio (**RTF: 0.324**), **343.28 MB PSS** delta, **52.84% WER**, **13.84% CER**, zero memory leaks.
+    * Classification: **MOBILE CANDIDATE**.
+* **Tamil Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-tamil-tam-250` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_tamil_base.int8.onnx` (117.02 MB, SHA-256: `33a91f3bce4b4025b0c561cde40fce2f029b1cc4ec85c8401f0869d030bb43b2`).
+    * On-device measurements: **660.77 ms** load time, **4795.3 ms** avg latency for 14.81s audio (**RTF: 0.324**), **223.27 MB PSS** delta, **50.00% WER**, **25.68% CER**, zero memory leaks.
+    * Classification: **MOBILE CANDIDATE**.
+
+## Telugu & Bengali Mobile STT Candidate Selection (Phase 7.6)
+* **Telugu Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-telugu-tem-100` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_telugu_base.int8.onnx` (117.03 MB, SHA-256: `c64bab6c69e7965d512c3b6d70fcf5f8e4f2f6e52e6c06307612c489bfd964bf`).
+    * On-device measurements: **493.41 ms** load time, **1526.9 ms** avg latency for 10.34s audio (**RTF: 0.148**), **354.84 MB PSS** delta, **34.34% WER**, **6.67% CER**, zero memory leaks.
+    * Classification: **MOBILE CANDIDATE**.
+* **Bengali Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-bengali-bnm-200` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_bengali_base.int8.onnx` (117.03 MB, SHA-256: `8aec0865d879c1428f413fe70e6c5f9ff22a2dd678c66f529be4f5794e49b961`).
+    * On-device measurements: **499.60 ms** load time, **3631.8 ms** avg latency for 13.13s audio (**RTF: 0.277**), **197.38 MB PSS** delta, **54.27% WER**, **15.25% CER**, zero memory leaks.
+    * Classification: **MOBILE CANDIDATE**.
+
+## Kannada & Odia Mobile STT Candidate Selection (Phase 7.7)
+* **Kannada Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-kannada-knm-560` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_kannada_base.int8.onnx` (117.03 MB, SHA-256: `9769b09b6c24d67acebc50f4436d1756f4a4b3ee3edec9c34099faa904f9f5a8`).
+    * On-device measurements: **866.39 ms** load time, **3982.7 ms** avg latency for 12.79s audio (**RTF: 0.311**), **339.35 MB PSS** delta, **38.34% WER**, **8.35% CER**, zero memory leaks.
+    * Classification: **MOBILE CANDIDATE**.
+* **Odia Model Selection**: Selected `Harveenchadha/vakyansh-wav2vec2-odia-orm-100` (Wav2Vec2-Base CTC, 94.4M params, MIT).
+    * Artifact: `vakyansh_odia_base.int8.onnx` (117.03 MB, SHA-256: `a0d3c21cf9b8a057779d92e678cc05c3b46142efe5767ba506e0a644ca8c8bba`).
+    * On-device measurements: **602.33 ms** load time, **2971.6 ms** avg latency for 10.39s audio (**RTF: 0.286**), **196.81 MB PSS** delta, **78.54% WER**, **24.08% CER**, zero memory leaks.
+    * Classification: **CONDITIONAL CANDIDATE** (functional native baseline; recommends vocabulary boosting / hybrid CTC/LM for complex domain terms).
+
+## Multilingual STT Production Architecture Design (Phase 7.8)
+* **Dual-Runtime Engine Pattern**:
+    * `sherpa-onnx` will continue running English Whisper Tiny INT8.
+    * Generic `ONNX Runtime Android` (`ai.onnxruntime:onnxruntime-android`) will execute all Indic Wav2Vec2 Base CTC INT8 models with non-autoregressive argmax greedy CTC decoding.
+* **Single-Active Model Policy**:
+    * Only one language model may be loaded into resident process memory at any given time.
+    * Switching languages requires an explicit state transition (`RELEASING` -> `session.close()` -> `LOADING` new session) ensuring peak process PSS remains well below the 1.2 GB safe limit on 4–6 GB Android devices.
+* **Transceiver Decoupling**:
+    * `TransceiverManager` communicates strictly with `LanguageModelManager` via a high-level `transcribe(samples): SttResult` contract, completely isolated from native runtime details and future model replacements.
+
+## Phase 7.9: Production Multilingual STT Integration (5 Languages)
+* **Initial 5-Language Production Set**:
+    * **English**: Whisper Tiny INT8 via sherpa-onnx (offline non-streaming autoregressive encoder-decoder). Preserved current baseline with 0% regression.
+    * **Hindi**: Vakyansh Wav2Vec2 INT8 ONNX via generic ONNX Runtime Android (`GenericOnnxCtcSttEngine`).
+    * **Gujarati**: Vakyansh Wav2Vec2 INT8 ONNX via generic ONNX Runtime Android (`GenericOnnxCtcSttEngine`).
+    * **Telugu**: Vakyansh Wav2Vec2 INT8 ONNX via generic ONNX Runtime Android (`GenericOnnxCtcSttEngine`).
+    * **Kannada**: Vakyansh Wav2Vec2 INT8 ONNX via generic ONNX Runtime Android (`GenericOnnxCtcSttEngine`).
+* **Dual-Runtime Native Library Isolation**:
+    * Resolved symbol collision between `sherpa-onnx`'s embedded ONNX Runtime (`libonnxruntime.so`) and `onnxruntime-android` (`libonnxruntime.so` / `libonnxruntime4j_jni.so`) by isolating the Microsoft ONNX Runtime binary to `libort_runtime.so` and patching the DT_NEEDED dependency in `libonnxruntime4j_jni.so`.
+    * Configured `useLegacyPackaging = true` to allow extraction and clean dynamic linking on Android 16.
+* **Single-Active Model Policy & Zero-Growth Verification**:
+    * Validated on physical Samsung Galaxy S24: 6 consecutive switches between English and Indic models exhibited 0 MB net memory growth (initial PSS: 709.5 MB, final PSS: 527.2 MB, net delta: -182.3 MB).
+    * Lazy loading verified: Indic models only load upon explicit language selection and completely deallocate their ONNX sessions, tensors, and environments before switching.

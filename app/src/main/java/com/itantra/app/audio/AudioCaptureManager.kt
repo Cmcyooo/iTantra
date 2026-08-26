@@ -50,6 +50,9 @@ class AudioCaptureManager(private val context: Context) {
     private var vadManager: VadManager? = null
     private var sttManager: SttManager? = null
 
+    val languageModelManager: LanguageModelManager
+        get() = LanguageModelManager.getInstance(context)
+
     // Accumulates audio samples during active speech
     private val speechAccumulator = mutableListOf<FloatArray>()
     private var speechSamplesCount = 0

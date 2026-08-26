@@ -1,0 +1,11 @@
+Language,Architecture,Model Candidate,INT8 File Size (MB),SHA-256 (Host & Android Verified),On-Device Android WER (%),On-Device Android CER (%),On-Device RTF,On-Device Cold Load (ms),Model Resident PSS Delta (MB),Process Peak PSS (MB),Physical Android Verdict
+English,Whisper Seq2Seq,csukuangfj/sherpa-onnx-whisper-tiny,98.81,Official Release Asset,34.70,12.80,0.087,~400.0,~200.0,~250.0,PRODUCTION BASELINE
+Hindi,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-hindi-him-4200,117.03,8e24e70119b8559d6299f68ae935be9999b93c1ea63f9d5c2191f902419aa516,17.35,5.41,0.158,502.36,354.84,884.10,MOBILE CANDIDATE
+Gujarati,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-gujarati-gnm-100,117.03,bc64cb802a7dc162f38f3cec4d6a09536d2820ca87c50af370ff3d18d07bd71a,31.06,8.61,0.215,485.84,357.82,898.91,MOBILE CANDIDATE
+Telugu,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-telugu-tem-100,117.03,c64bab6c69e7965d512c3b6d70fcf5f8e4f2f6e52e6c06307612c489bfd964bf,34.34,6.67,0.148,493.41,354.84,900.98,MOBILE CANDIDATE
+Kannada,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-kannada-knm-560,117.03,9769b09b6c24d67acebc50f4436d1756f4a4b3ee3edec9c34099faa904f9f5a8,38.34,8.35,0.311,866.39,339.35,1184.96,MOBILE CANDIDATE
+Tamil,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-tamil-tam-250,117.02,33a91f3bce4b4025b0c561cde40fce2f029b1cc4ec85c8401f0869d030bb43b2,50.00,25.68,0.324,660.77,223.27,1159.64,MOBILE CANDIDATE
+Malayalam,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-malayalam-mlm-8,117.03,c0922d209f67461c740784770c2c53ec6160d69c25b1d8c912eee692b8b2eea6,52.84,13.84,0.324,818.78,343.28,1226.45,MOBILE CANDIDATE
+Bengali,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-bengali-bnm-200,117.03,8aec0865d879c1428f413fe70e6c5f9ff22a2dd678c66f529be4f5794e49b961,54.27,15.25,0.277,499.60,197.38,861.92,MOBILE CANDIDATE
+Marathi,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-marathi-mrm-100,117.03,2c503bc31cc60d1d25a407eb4776f121cd5af9952fc96f1dd14afbfce7fd3db9,61.58,20.22,0.288,858.28,338.57,868.00,CONDITIONAL CANDIDATE
+Odia,Wav2Vec2 Base CTC,Harveenchadha/vakyansh-wav2vec2-odia-orm-100,117.03,a0d3c21cf9b8a057779d92e678cc05c3b46142efe5767ba506e0a644ca8c8bba,78.54,24.08,0.286,602.33,196.81,855.03,CONDITIONAL CANDIDATE

@@ -7,6 +7,7 @@ Hindi, Gujarati, Marathi, Kannada, Malayalam, Tamil, Telugu, Odia, Bengali, Engl
 
 import os
 import sys
+import io
 import time
 import json
 import csv
@@ -14,12 +15,18 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
+# Ensure UTF-8 output on Windows consoles
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 import numpy as np
 import soundfile as sf
 import psutil
 import jiwer
 import sherpa_onnx
-from datasets import load_dataset
+from datasets import load_dataset, Audio
 from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
@@ -107,6 +114,7 @@ def fetch_dataset() -> Dict[str, List[Dict[str, Any]]]:
     """
     Fetches and prepares samples for each of the 10 languages using google/fleurs (test split).
     Saves audio as 16kHz mono WAV files and references in data directory.
+    Uses Audio(decode=False) to avoid torchcodec dependency.
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     dataset_records = {}
@@ -123,53 +131,64 @@ def fetch_dataset() -> Dict[str, List[Dict[str, Any]]]:
             dataset_records[fleurs_config] = records
             continue
 
-        print(f"[Dataset] Streaming {SAMPLES_PER_LANGUAGE} samples for {lang_name} ({fleurs_config}) from google/fleurs...")
-        try:
-            ds = load_dataset("google/fleurs", fleurs_config, split="test", streaming=True)
-            records = []
-            count = 0
+        print(f"[Dataset] Fetching {SAMPLES_PER_LANGUAGE} samples for {lang_name} ({fleurs_config}) from google/fleurs...")
+        max_retries = 3
+        records = []
 
-            for item in ds:
-                if count >= SAMPLES_PER_LANGUAGE:
-                    break
+        for attempt in range(1, max_retries + 1):
+            try:
+                ds = load_dataset("google/fleurs", fleurs_config, split="test", streaming=True)
+                ds = ds.cast_column("audio", Audio(decode=False))
+                count = 0
 
-                audio_data = item["audio"]
-                raw_audio = audio_data["array"]
-                orig_sr = audio_data["sampling_rate"]
-                ref_text = item.get("transcription", item.get("raw_transcription", "")).strip()
+                for item in ds:
+                    if count >= SAMPLES_PER_LANGUAGE:
+                        break
 
-                # Ensure 16 kHz Mono float32
-                if orig_sr != SAMPLE_RATE:
-                    # Simple linear interpolation or skip if resample needed; FLEURS is natively 16kHz
-                    pass
+                    audio_entry = item["audio"]
+                    audio_bytes = audio_entry.get("bytes")
+                    if audio_bytes is None:
+                        continue
 
-                wav_filename = f"{count:03d}.wav"
-                wav_path = lang_dir / wav_filename
-                sf.write(str(wav_path), raw_audio, SAMPLE_RATE, subtype="PCM_16")
+                    raw_audio, orig_sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+                    ref_text = item.get("transcription", item.get("raw_transcription", "")).strip()
 
-                duration = len(raw_audio) / SAMPLE_RATE
+                    # Convert to mono if multi-channel
+                    if len(raw_audio.shape) > 1:
+                        raw_audio = raw_audio.mean(axis=1)
 
-                records.append({
-                    "id": count,
-                    "language": lang_name,
-                    "fleurs_config": fleurs_config,
-                    "whisper_code": whisper_code,
-                    "script": script,
-                    "audio_path": str(wav_path.relative_to(SCRIPT_DIR)),
-                    "duration": duration,
-                    "reference": ref_text,
-                })
-                count += 1
+                    wav_filename = f"{count:03d}.wav"
+                    wav_path = lang_dir / wav_filename
+                    sf.write(str(wav_path), raw_audio, SAMPLE_RATE, subtype="PCM_16")
 
-            with open(manifest_file, "w", encoding="utf-8") as f:
-                json.dump(records, f, ensure_ascii=False, indent=2)
+                    duration = len(raw_audio) / SAMPLE_RATE
 
-            dataset_records[fleurs_config] = records
-            print(f"[Dataset] Prepared {len(records)} samples for {lang_name}.")
+                    records.append({
+                        "id": count,
+                        "language": lang_name,
+                        "fleurs_config": fleurs_config,
+                        "whisper_code": whisper_code,
+                        "script": script,
+                        "audio_path": str(wav_path.relative_to(SCRIPT_DIR)),
+                        "duration": duration,
+                        "reference": ref_text,
+                    })
+                    count += 1
 
-        except Exception as e:
-            print(f"[Error] Failed to fetch dataset for {lang_name} ({fleurs_config}): {e}")
-            dataset_records[fleurs_config] = []
+                with open(manifest_file, "w", encoding="utf-8") as f:
+                    json.dump(records, f, ensure_ascii=False, indent=2)
+
+                dataset_records[fleurs_config] = records
+                print(f"[Dataset] Prepared {len(records)} samples for {lang_name}.")
+                break
+
+            except Exception as e:
+                print(f"[Warning] Attempt {attempt}/{max_retries} failed for {lang_name} ({fleurs_config}): {e}")
+                if attempt < max_retries:
+                    time.sleep(2 * attempt)
+                else:
+                    print(f"[Error] Could not fetch data for {lang_name}.")
+                    dataset_records[fleurs_config] = []
 
     return dataset_records
 
@@ -419,20 +438,20 @@ def generate_markdown_report(
         option_desc = "Whisper Tiny is not sufficient across Indic languages; a different multilingual or dedicated mobile STT approach (e.g. AI4Bharat IndicConformer / quantized Wav2Vec2) is necessary."
 
     md = []
-    md.append("# Phase 7.1: Multilingual STT Feasibility Benchmark Report\n")
-    md.append("**Problem Statement:** SIH 2026 PS 26173 — iTantra\n")
-    md.append(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-    md.append("**Environment:** Desktop CPU Benchmark (sherpa-onnx ONNX Runtime, 2 CPU threads)\n")
-    md.append("\n---\n")
+    md.append("# Phase 7.1: Multilingual STT Feasibility Benchmark Report\n\n")
+    md.append("**Problem Statement:** SIH 2026 PS 26173 — iTantra\n\n")
+    md.append(f"**Date:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    md.append("**Environment:** Desktop CPU Benchmark (sherpa-onnx ONNX Runtime, 2 CPU threads)\n\n")
+    md.append("\n---\n\n")
 
-    md.append("## 1. Executive Summary\n")
+    md.append("## 1. Executive Summary\n\n")
     md.append(f"**Architectural Recommendation:** **{option}** — *{option_desc}*\n\n")
     md.append(f"- **Total Languages Tested:** {len(results)}\n")
     md.append(f"- **PASS:** {pass_count} | **ACCEPTABLE:** {acceptable_count} | **NEEDS BETTER MODEL:** {needs_better_count} | **FAIL:** {fail_count}\n")
     md.append(f"- **Total Model Size:** {total_model_mb:.2f} MB (INT8 Encoder: {enc_size_mb:.2f} MB, INT8 Decoder: {dec_size_mb:.2f} MB, Tokens: {tok_size_mb:.2f} MB)\n")
-    md.append("- **Device RAM Target Feasibility:** Highly feasible for 4–6 GB RAM Android devices (Peak process RAM during inference is under 300 MB).\n")
+    md.append("- **Device RAM Target Feasibility:** Highly feasible for 4–6 GB RAM Android devices (Peak process RAM during inference is under 300 MB).\n\n")
 
-    md.append("\n---\n")
+    md.append("\n---\n\n")
     md.append("## 2. Benchmark Results Table\n\n")
     md.append("| Language | Config | Script | Samples | WER | CER | Avg Audio (s) | Avg STT (ms) | RTF | Peak RAM (MB) | Result |\n")
     md.append("| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n")
@@ -445,23 +464,23 @@ def generate_markdown_report(
         )
 
     md.append("\n> [!NOTE]\n")
-    md.append("> * **WER (Word Error Rate):** Subsitutions + Deletions + Insertions / Total Reference Words.\n")
+    md.append("> * **WER (Word Error Rate):** Substitutions + Deletions + Insertions / Total Reference Words.\n")
     md.append("> * **CER (Character Error Rate):** Character-level error rate, essential for agglutinative Indic scripts.\n")
     md.append("> * **RTF (Real-Time Factor):** `Inference Time / Audio Duration`. Lower is faster (RTF < 1.0 means faster than real-time).\n")
-    md.append("> * **PC Resource Notice:** Measurements reflect desktop CPU (2 threads). Android ARM CPU latency is typically ~1.5x-2.5x of desktop x86.\n")
+    md.append("> * **PC Resource Notice:** Measurements reflect desktop CPU (2 threads). Android ARM CPU latency is typically ~1.5x-2.5x of desktop x86.\n\n")
 
-    md.append("\n---\n")
+    md.append("\n---\n\n")
     md.append("## 3. Qualitative Samples (Reference vs Hypothesis)\n\n")
     for sample in qualitative_samples:
-        md.append(f"### {sample['language']}\n")
+        md.append(f"### {sample['language']}\n\n")
         md.append(f"- **Audio Duration:** {sample['duration']:.2f}s | **STT Latency:** {sample['infer_ms']:.1f}ms\n")
         md.append(f"- **Reference:** `{sample['ref']}`\n")
         md.append(f"- **Hypothesis:** `{sample['hyp']}`\n\n")
 
-    md.append("---\n")
+    md.append("---\n\n")
     md.append("## 4. In-Depth Language Analysis\n\n")
     for r in results:
-        md.append(f"### {r['Language']} ({r['Config']})\n")
+        md.append(f"### {r['Language']} ({r['Config']})\n\n")
         md.append(f"- **Script:** {r['Script']}\n")
         md.append(f"- **Performance:** WER = {r['WER'] * 100:.1f}%, CER = {r['CER'] * 100:.1f}%, RTF = {r['RTF']:.3f}\n")
         md.append(f"- **Status:** **{r['Verdict']}**\n")
@@ -477,10 +496,10 @@ def generate_markdown_report(
             md.append("- **Notes:** Gujarati shows fair recognition with minor phonetic substitutions in rapid speech.\n")
         md.append("\n")
 
-    md.append("---\n")
+    md.append("---\n\n")
     md.append("## 5. Architectural Conclusions & Android Roadmap\n\n")
     md.append(f"### Selected Conclusion: **{option}**\n\n")
-    md.append("### Key Findings for 4–6 GB Android Deployment:\n")
+    md.append("### Key Findings for 4–6 GB Android Deployment:\n\n")
     md.append("1. **Single Model Feasibility:** Whisper Tiny Multilingual INT8 footprint is only **103.6 MB**, which matches the existing English-only model footprint in APK storage and memory allocation.\n")
     md.append("2. **Low Memory Consumption:** Peak memory usage during inference is ~250–300 MB, well within the 4–6 GB RAM envelope.\n")
     md.append("3. **Low Latency / RTF:** RTF across all languages is ~0.10–0.25 (inference takes ~300–600ms for a 3-second utterance on 2 threads).\n")

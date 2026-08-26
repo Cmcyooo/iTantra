@@ -1,7 +1,10 @@
 package com.itantra.app.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,8 +16,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +36,13 @@ import androidx.core.content.ContextCompat
 import com.itantra.app.audio.*
 import com.itantra.app.comm.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+enum class TransportMode {
+    WIFI,
+    WIFI_DIRECT,
+    BLUETOOTH
+}
 
 @Composable
 fun MicrophoneTestScreen(
@@ -38,31 +50,88 @@ fun MicrophoneTestScreen(
     ttsManager: TtsManager,
     commManager: CommunicationManager,
     discoveryManager: DiscoveryManager,
-    transceiverManager: TransceiverManager
+    wifiDirectManager: WiFiDirectManager,
+    bluetoothDiscoveryManager: BluetoothDiscoveryManager,
+    callSignManager: CallSignManager,
+    transceiverManager: TransceiverManager,
+    onTransportModeChange: (TransportMode) -> Unit
 ) {
     val context = LocalContext.current
     val audioState by audioManager.state.collectAsState()
     val commState by commManager.connectionState.collectAsState()
     val commMessages by commManager.messages.collectAsState()
     val transceiverState by transceiverManager.uiState.collectAsState()
-    val discoveredDevices by discoveryManager.discoveredDevices.collectAsState()
-    val isSearching by discoveryManager.isSearching.collectAsState()
     
+    val wifiDevices by discoveryManager.discoveredDevices.collectAsState()
+    val isWifiSearching by discoveryManager.isSearching.collectAsState()
+
+    val wifiDirectPeers by wifiDirectManager.peers.collectAsState()
+    val isWifiDirectSearching by wifiDirectManager.isDiscoveryActive.collectAsState()
+    
+    val bluetoothDevices by bluetoothDiscoveryManager.discoveredDevices.collectAsState()
+    val isBluetoothSearching by bluetoothDiscoveryManager.isSearching.collectAsState()
+    
+    var transportMode by remember { mutableStateOf(TransportMode.WIFI) }
     var showSettings by remember { mutableStateOf(false) }
     
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
+    var localCallSign by remember { mutableStateOf(callSignManager.getCallSign()) }
+    
+    val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        listOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_ADVERTISE
+        )
+    } else {
+        listOf(
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.ACCESS_FINE_LOCATION
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val wifiDirectPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        listOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+    } else {
+        listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    
+    var hasBluetoothPermission by remember {
+        mutableStateOf(
+            bluetoothPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    var hasWifiDirectPermission by remember {
+        mutableStateOf(
+            wifiDirectPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasPermission = isGranted
+    ) { hasAudioPermission = it }
+
+    val wifiDirectPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasWifiDirectPermission = permissions.values.all { it }
+    }
+
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasBluetoothPermission = permissions.values.all { it }
     }
 
     val scrollState = rememberScrollState()
@@ -76,17 +145,22 @@ fun MicrophoneTestScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // --- HEADER ---
-        HeaderSection(commState)
+        HeaderSection(commState, transportMode)
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- LANGUAGE SELECTOR ---
+        LanguageSelectorSection(audioManager.languageModelManager)
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- PTT CONTROL ---
         PTTSection(
             state = transceiverState,
-            hasPermission = hasPermission,
+            hasPermission = hasAudioPermission,
             onStartTalk = { transceiverManager.startTalk() },
             onStopTalk = { transceiverManager.stopTalk() },
-            onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+            onRequestPermission = { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -112,26 +186,112 @@ fun MicrophoneTestScreen(
         }
 
         AnimatedVisibility(visible = showSettings) {
-            DiscoverySection(
-                commState = commState,
-                discoveredDevices = discoveredDevices,
-                isSearching = isSearching,
-                onConnect = { ip -> 
-                    commManager.disconnect() // Ensure fresh state
-                    commManager.connect(ip) 
-                },
-                onDisconnect = { commManager.disconnect() },
-                onRescan = {
-                    discoveryManager.stopDiscovery()
-                    discoveryManager.startDiscovery()
+            Column {
+                CallSignSection(
+                    callSign = localCallSign,
+                    onCallSignChange = { localCallSign = it },
+                    onSave = { callSignManager.saveCallSign(localCallSign) }
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TransportSelector(
+                    currentMode = transportMode,
+                    onModeChange = { mode ->
+                        when (mode) {
+                            TransportMode.BLUETOOTH -> {
+                                if (!hasBluetoothPermission) {
+                                    bluetoothPermissionLauncher.launch(bluetoothPermissions.toTypedArray())
+                                } else {
+                                    transportMode = mode
+                                    onTransportModeChange(mode)
+                                }
+                            }
+                            TransportMode.WIFI_DIRECT -> {
+                                if (!hasWifiDirectPermission) {
+                                    wifiDirectPermissionLauncher.launch(wifiDirectPermissions.toTypedArray())
+                                } else {
+                                    transportMode = mode
+                                    onTransportModeChange(mode)
+                                }
+                            }
+                            TransportMode.WIFI -> {
+                                transportMode = mode
+                                onTransportModeChange(mode)
+                            }
+                        }
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (transportMode == TransportMode.WIFI) {
+                    DiscoverySection(
+                        title = "Nearby Wi-Fi iTantra Devices",
+                        commState = commState,
+                        discoveredDevices = wifiDevices.map { it.name to it.ip },
+                        isSearching = isWifiSearching,
+                        onConnect = { ip -> 
+                            commManager.disconnect()
+                            commManager.connect(ip) 
+                        },
+                        onDisconnect = { commManager.disconnect() },
+                        onRescan = {
+                            discoveryManager.stopDiscovery()
+                            discoveryManager.startDiscovery()
+                        }
+                    )
+                } else if (transportMode == TransportMode.WIFI_DIRECT) {
+                    DiscoverySection(
+                        title = "Nearby Wi-Fi Direct iTantra Devices",
+                        commState = commState,
+                        discoveredDevices = wifiDirectPeers.map { it.deviceName to it.deviceAddress },
+                        isSearching = isWifiDirectSearching,
+                        onConnect = { address -> 
+                            commManager.disconnect()
+                            commManager.connect(address) 
+                        },
+                        onDisconnect = { commManager.disconnect() },
+                        onRescan = {
+                            wifiDirectManager.stopDiscovery()
+                            wifiDirectManager.startDiscovery()
+                        }
+                    )
+                } else {
+                    DiscoverySection(
+                        title = "Nearby Bluetooth iTantra Devices",
+                        commState = commState,
+                        discoveredDevices = bluetoothDevices.map { device ->
+                            @SuppressLint("MissingPermission")
+                            val systemName = device.name
+                            val savedCallSign = callSignManager.getPeerCallSign(device.address)
+                            
+                            val displayName = when {
+                                !savedCallSign.isNullOrEmpty() -> savedCallSign
+                                !systemName.isNullOrEmpty() -> systemName
+                                else -> "iTantra Device"
+                            }
+                            displayName to device.address 
+                        },
+                        isSearching = isBluetoothSearching,
+                        onConnect = { address -> 
+                            commManager.disconnect()
+                            commManager.connect(address) 
+                        },
+                        onDisconnect = { commManager.disconnect() },
+                        onRescan = {
+                            bluetoothDiscoveryManager.stopDiscovery()
+                            bluetoothDiscoveryManager.startDiscovery()
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
 
 @Composable
-fun HeaderSection(commState: ConnectionState) {
+fun HeaderSection(commState: ConnectionState, transportMode: TransportMode) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "iTantra",
@@ -150,7 +310,15 @@ fun HeaderSection(commState: ConnectionState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                Text("Local Wi-Fi", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = when(transportMode) {
+                        TransportMode.WIFI -> "Local Wi-Fi"
+                        TransportMode.WIFI_DIRECT -> "Wi-Fi Direct"
+                        TransportMode.BLUETOOTH -> "Bluetooth"
+                    },
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), 
+                    style = MaterialTheme.typography.labelSmall
+                )
             }
             Badge(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text("No Internet Required", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
@@ -327,9 +495,72 @@ fun PerformanceItem(label: String, value: String) {
 }
 
 @Composable
+fun CallSignSection(
+    callSign: String,
+    onCallSignChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("My iTantra Call Sign", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = callSign,
+                    onValueChange = onCallSignChange,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onSave) {
+                    Text("SAVE")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TransportSelector(currentMode: TransportMode, onModeChange: (TransportMode) -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = currentMode == TransportMode.WIFI,
+                onClick = { onModeChange(TransportMode.WIFI) },
+                label = { Text("Wi-Fi") },
+                leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.weight(1f)
+            )
+            FilterChip(
+                selected = currentMode == TransportMode.WIFI_DIRECT,
+                onClick = { onModeChange(TransportMode.WIFI_DIRECT) },
+                label = { Text("P2P") },
+                leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.weight(1f)
+            )
+            FilterChip(
+                selected = currentMode == TransportMode.BLUETOOTH,
+                onClick = { onModeChange(TransportMode.BLUETOOTH) },
+                label = { Text("BT") },
+                leadingIcon = { Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
 fun DiscoverySection(
+    title: String,
     commState: ConnectionState,
-    discoveredDevices: List<DiscoveryManager.DiscoveredDevice>,
+    discoveredDevices: List<Pair<String, String>>,
     isSearching: Boolean,
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit,
@@ -347,12 +578,16 @@ fun DiscoverySection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Nearby iTantra Devices", style = MaterialTheme.typography.titleSmall)
+            Text(title, style = MaterialTheme.typography.titleSmall)
             if (isSearching) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Scanning...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+                }
             } else {
                 Text(
-                    "Rescan",
+                    "Ready (Rescan)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { onRescan() }
@@ -364,17 +599,18 @@ fun DiscoverySection(
         
         if (discoveredDevices.isEmpty()) {
             Text(
-                "Searching for nearby devices...",
+                if (isSearching) "Searching for nearby devices..." else "No nearby iTantra devices found.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {
-            discoveredDevices.forEach { device ->
+            discoveredDevices.forEach { (name, address) ->
                 DeviceItem(
-                    device = device,
-                    isConnected = commState == ConnectionState.CONNECTED, // Simplified check
-                    onConnect = { onConnect(device.ip) }
+                    name = name,
+                    address = address,
+                    isConnected = commState == ConnectionState.CONNECTED,
+                    onConnect = { onConnect(address) }
                 )
             }
         }
@@ -394,7 +630,8 @@ fun DiscoverySection(
 
 @Composable
 fun DeviceItem(
-    device: DiscoveryManager.DiscoveredDevice,
+    name: String,
+    address: String,
     isConnected: Boolean,
     onConnect: () -> Unit
 ) {
@@ -415,12 +652,12 @@ fun DeviceItem(
         ) {
             Column {
                 Text(
-                    text = "📱 ${device.name}",
+                    text = "📱 $name",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Available • ${device.ip}",
+                    text = "Available • $address",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -431,6 +668,101 @@ fun DeviceItem(
                 enabled = !isConnected
             ) {
                 Text("Connect")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LanguageSelectorSection(languageModelManager: LanguageModelManager) {
+    val currentLang by languageModelManager.currentLanguage.collectAsState()
+    val lifecycleState by languageModelManager.lifecycleState.collectAsState()
+    val scope = rememberCoroutineScope()
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Speech Language",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                val statusText = when (lifecycleState) {
+                    ModelLifecycleState.UNLOADED -> "Idle"
+                    ModelLifecycleState.LOADING -> "Loading ${currentLang.displayName}..."
+                    ModelLifecycleState.RELEASING -> "Releasing..."
+                    ModelLifecycleState.READY -> "Ready"
+                    ModelLifecycleState.TRANSCRIBING -> "Transcribing..."
+                    ModelLifecycleState.FAILED -> "Failed"
+                }
+
+                val statusColor = when (lifecycleState) {
+                    ModelLifecycleState.READY -> Color(0xFF4CAF50)
+                    ModelLifecycleState.LOADING, ModelLifecycleState.RELEASING -> Color(0xFFFF9800)
+                    ModelLifecycleState.TRANSCRIBING -> Color(0xFF2196F3)
+                    ModelLifecycleState.FAILED -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = statusColor,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { if (lifecycleState != ModelLifecycleState.LOADING && lifecycleState != ModelLifecycleState.RELEASING) expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = "${currentLang.displayName} (${currentLang.nativeName})",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    enabled = lifecycleState != ModelLifecycleState.LOADING && lifecycleState != ModelLifecycleState.RELEASING
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    SupportedLanguage.values().forEach { lang ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "${lang.displayName} (${lang.nativeName})",
+                                    fontWeight = if (lang == currentLang) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                expanded = false
+                                if (lang != currentLang) {
+                                    scope.launch {
+                                        languageModelManager.setLanguage(lang)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
     }

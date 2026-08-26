@@ -30,7 +30,8 @@ class TransceiverManager(
     private val context: Context,
     private val audioManager: AudioCaptureManager,
     private val ttsManager: TtsManager,
-    private val commManager: CommunicationManager
+    private val commManager: CommunicationManager,
+    private val callSignManager: CallSignManager
 ) {
     private val _uiState = MutableStateFlow(TransceiverState.IDLE)
     val uiState: StateFlow<TransceiverState> = _uiState.asStateFlow()
@@ -64,6 +65,16 @@ class TransceiverManager(
         // Observe Incoming Messages
         commManager.setOnMessageReceivedListener { message: P2PMessage ->
             handleIncomingMessage(message)
+        }
+        
+        // Identity exchange on connection
+        scope.launch {
+            commManager.connectionState.collect { state ->
+                if (state == ConnectionState.CONNECTED) {
+                    // Send local identity as an empty text message with senderName
+                    commManager.sendText("", senderName = callSignManager.getCallSign())
+                }
+            }
         }
     }
 
@@ -116,7 +127,7 @@ class TransceiverManager(
         scope.launch {
             val sendStartTime = System.currentTimeMillis()
             _uiState.value = TransceiverState.FORWARDING
-            commManager.sendText(text)
+            commManager.sendText(text, senderName = callSignManager.getCallSign())
             val sendEndTime = System.currentTimeMillis()
             Log.d(TAG, "Latency: STT End -> Network Send: ${sendEndTime - sendStartTime}ms")
             
@@ -132,8 +143,18 @@ class TransceiverManager(
         scope.launch {
             val receiveTime = System.currentTimeMillis()
             val transportLatency = receiveTime - message.timestamp
-            Log.d(TAG, "Incoming P2P message: ${message.text}. Network Latency: ${transportLatency}ms")
+            Log.d(TAG, "Incoming P2P message: ${message.text}. Sender: ${message.senderName}. Network Latency: ${transportLatency}ms")
             
+            // Update peer call sign mapping
+            if (!message.senderName.isNullOrEmpty()) {
+                commManager.getConnectedPeerId()?.let { peerId ->
+                    callSignManager.savePeerCallSign(peerId, message.senderName)
+                }
+            }
+            
+            // If it's just an identity exchange (empty text), don't process further
+            if (message.text.isEmpty()) return@launch
+
             lastReceivedText = message.text
             _uiState.value = TransceiverState.RECEIVING
             ttsManager.speak(message.text)

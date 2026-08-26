@@ -11,5 +11,6 @@ data class P2PMessage(
     val messageId: String,
     val timestamp: Long,
     val language: String = "en",
-    val text: String
+    val text: String,
+    val senderName: String? = null
 )

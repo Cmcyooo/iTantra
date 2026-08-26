@@ -1,0 +1,4 @@
+Model Candidate,Architecture,Format,Size (MB),SHA-256,WER (%),CER (%),Avg Latency (ms),RTF,Audit Recommendation
+Whisper Tiny Multilingual INT8 (Baseline),Whisper Seq2Seq,ONNX INT8,98.81,N/A,119.7,96.4,1287.6,0.120,REJECTED (Severe Latin Transliteration / Hallucination)
+Harveenchadha/vakyansh-wav2vec2-telugu-tem-100 (PyTorch),Wav2Vec2 Base CTC,PyTorch FP32,378.0,N/A,36.87,7.06,810.8,0.078,Primary Mobile Candidate
+vakyansh_telugu_base.int8.onnx (Quantized),Wav2Vec2 Base CTC,ONNX INT8,117.03,c64bab6c69e7965d512c3b6d70fcf5f8e4f2f6e52e6c06307612c489bfd964bf,33.84,6.67,1191.5,0.115,PRIMARY MOBILE CANDIDATE

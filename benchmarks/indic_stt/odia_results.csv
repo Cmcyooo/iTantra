@@ -1,0 +1,4 @@
+Model Candidate,Architecture,Format,Size (MB),SHA-256,WER (%),CER (%),Avg Latency (ms),RTF,Audit Recommendation
+Whisper Tiny Multilingual INT8 (Baseline),Whisper Seq2Seq,ONNX INT8,98.81,N/A,145.0,112.5,1310.2,0.110,REJECTED (Unsupported Language in Whisper / Severe Hallucination)
+Harveenchadha/vakyansh-wav2vec2-odia-orm-100 (PyTorch),Wav2Vec2 Base CTC,PyTorch FP32,378.0,N/A,77.63,24.72,981.2,0.094,Primary Mobile Candidate
+vakyansh_odia_base.int8.onnx (Quantized),Wav2Vec2 Base CTC,ONNX INT8,117.03,a0d3c21cf9b8a057779d92e678cc05c3b46142efe5767ba506e0a644ca8c8bba,79.45,25.70,1695.6,0.163,PRIMARY MOBILE CANDIDATE
