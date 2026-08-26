@@ -37,6 +37,7 @@ fun MicrophoneTestScreen(
     audioManager: AudioCaptureManager,
     ttsManager: TtsManager,
     commManager: CommunicationManager,
+    discoveryManager: DiscoveryManager,
     transceiverManager: TransceiverManager
 ) {
     val context = LocalContext.current
@@ -44,9 +45,10 @@ fun MicrophoneTestScreen(
     val commState by commManager.connectionState.collectAsState()
     val commMessages by commManager.messages.collectAsState()
     val transceiverState by transceiverManager.uiState.collectAsState()
+    val discoveredDevices by discoveryManager.discoveredDevices.collectAsState()
+    val isSearching by discoveryManager.isSearching.collectAsState()
     
     var showSettings by remember { mutableStateOf(false) }
-    var targetIp by remember { mutableStateOf("") }
     
     var hasPermission by remember {
         mutableStateOf(
@@ -110,12 +112,19 @@ fun MicrophoneTestScreen(
         }
 
         AnimatedVisibility(visible = showSettings) {
-            SettingsSection(
+            DiscoverySection(
                 commState = commState,
-                targetIp = targetIp,
-                onIpChange = { targetIp = it },
-                onConnect = { commManager.connect(targetIp.takeIf { it.isNotBlank() }) },
-                onDisconnect = { commManager.disconnect() }
+                discoveredDevices = discoveredDevices,
+                isSearching = isSearching,
+                onConnect = { ip -> 
+                    commManager.disconnect() // Ensure fresh state
+                    commManager.connect(ip) 
+                },
+                onDisconnect = { commManager.disconnect() },
+                onRescan = {
+                    discoveryManager.stopDiscovery()
+                    discoveryManager.startDiscovery()
+                }
             )
         }
     }
@@ -135,6 +144,18 @@ fun HeaderSection(commState: ConnectionState) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        
+        Row(
+            modifier = Modifier.padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                Text("Local Wi-Fi", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
+            }
+            Badge(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
+                Text("No Internet Required", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
+            }
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -306,12 +327,13 @@ fun PerformanceItem(label: String, value: String) {
 }
 
 @Composable
-fun SettingsSection(
+fun DiscoverySection(
     commState: ConnectionState,
-    targetIp: String,
-    onIpChange: (String) -> Unit,
-    onConnect: () -> Unit,
-    onDisconnect: () -> Unit
+    discoveredDevices: List<DiscoveryManager.DiscoveredDevice>,
+    isSearching: Boolean,
+    onConnect: (String) -> Unit,
+    onDisconnect: () -> Unit,
+    onRescan: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -320,35 +342,95 @@ fun SettingsSection(
             .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
             .padding(16.dp)
     ) {
-        Text("Network Configuration", style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Nearby iTantra Devices", style = MaterialTheme.typography.titleSmall)
+            if (isSearching) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Text(
+                    "Rescan",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onRescan() }
+                )
+            }
+        }
+        
         Spacer(modifier = Modifier.height(12.dp))
         
-        OutlinedTextField(
-            value = targetIp,
-            onValueChange = onIpChange,
-            label = { Text("Target IP (Leave blank for Host)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = commState == ConnectionState.DISCONNECTED
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onConnect,
-                modifier = Modifier.weight(1f),
-                enabled = commState == ConnectionState.DISCONNECTED || commState == ConnectionState.ERROR
-            ) {
-                Text(if (targetIp.isBlank()) "HOST" else "CONNECT")
+        if (discoveredDevices.isEmpty()) {
+            Text(
+                "Searching for nearby devices...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        } else {
+            discoveredDevices.forEach { device ->
+                DeviceItem(
+                    device = device,
+                    isConnected = commState == ConnectionState.CONNECTED, // Simplified check
+                    onConnect = { onConnect(device.ip) }
+                )
             }
+        }
+        
+        if (commState != ConnectionState.DISCONNECTED) {
+            Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onDisconnect,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                enabled = commState != ConnectionState.DISCONNECTED
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
                 Text("DISCONNECT")
+            }
+        }
+    }
+}
+
+@Composable
+fun DeviceItem(
+    device: DiscoveryManager.DiscoveredDevice,
+    isConnected: Boolean,
+    onConnect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "📱 ${device.name}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Available • ${device.ip}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Button(
+                onClick = onConnect,
+                enabled = !isConnected
+            ) {
+                Text("Connect")
             }
         }
     }

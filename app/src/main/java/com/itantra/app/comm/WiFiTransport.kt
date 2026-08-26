@@ -152,6 +152,7 @@ class WiFiTransport : Transport {
             writer?.close()
             clientSocket?.close()
             serverSocket?.close()
+            Log.d(TAG, "Sockets and streams closed.")
         } catch (e: Exception) {
             Log.w(TAG, "Error during cleanup", e)
         } finally {

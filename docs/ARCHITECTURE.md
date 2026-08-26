@@ -6,8 +6,9 @@
 3.  **STT (Future)**: Speech-to-Text conversion using Whisper (likely via `sherpa-onnx`).
 4.  **Text-to-Speech (TTS)**: `TtsManager` uses `sherpa-onnx` with `VITS (Piper)` model and `AudioTrack` for playback.
 5.  **Text Transport**: `CommunicationManager` coordinates data exchange via `Transport` interface. `WiFiTransport` implements this using local TCP Sockets.
-6.  **Transceiver Coordinator**: `TransceiverManager` wires all components into a unified PTT-based flow.
-7.  **Speaker**: Audio playback.
+6.  **Device Discovery**: `DiscoveryManager` uses Android NSD (Network Service Discovery) to automatically find and resolve IP addresses of nearby iTantra peers on the same Wi-Fi network.
+7.  **Transceiver Coordinator**: `TransceiverManager` wires all components into a unified PTT-based flow.
+8.  **Speaker**: Audio playback.
 
 ## Design Principles
 * **Offline First**: All processing must happen on-device.

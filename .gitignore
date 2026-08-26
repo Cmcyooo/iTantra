@@ -16,3 +16,10 @@ local.properties
 
 .idea/
 gradle/gradle-daemon-jvm.properties
+
+# Benchmark data and models
+benchmarks/**/data/
+benchmarks/**/models/
+benchmarks/**/*.wav
+benchmarks/**/*.onnx
+benchmarks/**/*.tar.bz2

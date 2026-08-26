@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
     // Instantiate managers at the activity level
     private val audioManager by lazy { AudioCaptureManager(this) }
     private val ttsManager by lazy { com.itantra.app.audio.TtsManager(this) }
+    private val discoveryManager by lazy { com.itantra.app.comm.DiscoveryManager(this) }
     private val commManager by lazy { com.itantra.app.comm.CommunicationManager(com.itantra.app.comm.WiFiTransport()) }
     private val transceiverManager by lazy { 
         com.itantra.app.comm.TransceiverManager(this, audioManager, ttsManager, commManager) 
@@ -27,6 +28,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // Start discovery and advertising automatically
+        discoveryManager.startAdvertising()
+        discoveryManager.startDiscovery()
+        
+        // Auto-start as Host so we're ready to receive
+        commManager.connect(null)
+
         setContent {
             com.itantra.app.ui.theme.ITantraTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -35,6 +43,7 @@ class MainActivity : ComponentActivity() {
                             audioManager = audioManager,
                             ttsManager = ttsManager,
                             commManager = commManager,
+                            discoveryManager = discoveryManager,
                             transceiverManager = transceiverManager
                         )
                     }
@@ -46,6 +55,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         // Ensure resources are released when the activity is destroyed
+        discoveryManager.stopAdvertising()
+        discoveryManager.stopDiscovery()
         audioManager.release()
         ttsManager.release()
         commManager.disconnect()
