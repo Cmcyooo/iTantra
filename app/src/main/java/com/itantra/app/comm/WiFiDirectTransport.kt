@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -29,17 +30,21 @@ class WiFiDirectTransport(
     private var clientSocket: Socket? = null
     private var writer: PrintWriter? = null
     private var receiverJob: Job? = null
+    private var connectionAttemptJob: Job? = null
     
     private var onMessageReceived: ((P2PMessage) -> Unit)? = null
     private val transportScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val PORT = 8888
+    private val CONNECTION_TIMEOUT_MS = 15000L
 
     private var connectionMonitorJob: Job? = null
 
     init {
+        Log.i(TAG, "Initializing WiFiDirectTransport")
         // Monitor WiFiDirectManager connection info
         connectionMonitorJob = transportScope.launch {
             wifiDirectManager.connectionInfo.collect { info ->
+                Log.d(TAG, "Observed connection info change: groupFormed=${info?.groupFormed}")
                 handleConnectionInfo(info)
             }
         }
@@ -47,27 +52,44 @@ class WiFiDirectTransport(
 
     private fun handleConnectionInfo(info: WifiP2pInfo?) {
         if (info == null) {
-            disconnect()
+            if (_connectionState.value != ConnectionState.DISCONNECTED) {
+                Log.d(TAG, "Connection info cleared, disconnecting transport")
+                disconnect()
+            }
             return
         }
 
         if (info.groupFormed) {
+            if (_connectionState.value == ConnectionState.CONNECTED) {
+                Log.d(TAG, "Already connected, ignoring redundant group formed info")
+                return
+            }
+
+            Log.i(TAG, "P2P Group Formed. IsOwner=${info.isGroupOwner}, Owner=${info.groupOwnerAddress?.hostAddress}")
             _connectionState.value = ConnectionState.CONNECTING
-            transportScope.launch {
+            
+            connectionAttemptJob?.cancel()
+            connectionAttemptJob = transportScope.launch {
                 try {
-                    if (info.isGroupOwner) {
-                        startServer()
-                    } else {
-                        val host = info.groupOwnerAddress?.hostAddress
-                        if (host != null) {
-                            startClient(host)
+                    withTimeout(CONNECTION_TIMEOUT_MS) {
+                        if (info.isGroupOwner) {
+                            startServer()
                         } else {
-                            throw Exception("Group owner address unknown")
+                            val host = info.groupOwnerAddress?.hostAddress
+                            if (host != null) {
+                                startClient(host)
+                            } else {
+                                throw Exception("Group owner address unknown")
+                            }
                         }
                     }
+                } catch (e: TimeoutCancellationException) {
+                    Log.e(TAG, "Socket connection timed out")
+                    _lastError.value = "Connection timed out"
+                    _connectionState.value = ConnectionState.ERROR
                 } catch (e: Exception) {
-                    Log.e(TAG, "Socket setup failed", e)
-                    _lastError.value = e.message
+                    Log.e(TAG, "Socket setup failed: ${e.message}", e)
+                    _lastError.value = e.message ?: "Socket connection failed"
                     _connectionState.value = ConnectionState.ERROR
                 }
             }
@@ -75,8 +97,7 @@ class WiFiDirectTransport(
     }
 
     override fun connect(targetId: String?) {
-        // targetId is the device address (MAC) if we are client
-        // If null, we just wait for connection (start discovery/advertising)
+        Log.i(TAG, "Connect requested. Target: ${targetId ?: "LISTEN"}")
         _connectionState.value = ConnectionState.CONNECTING
         _lastError.value = null
         
@@ -85,11 +106,13 @@ class WiFiDirectTransport(
             if (peer != null) {
                 wifiDirectManager.connect(peer)
             } else {
+                Log.e(TAG, "Peer with address $targetId not found in discovered list")
                 _lastError.value = "Peer not found"
                 _connectionState.value = ConnectionState.ERROR
             }
         } else {
             // As host, we just start discovery to be found
+            Log.d(TAG, "No target ID, starting discovery to wait for incoming connections")
             wifiDirectManager.startDiscovery()
         }
     }
@@ -97,38 +120,64 @@ class WiFiDirectTransport(
     private suspend fun startServer() = withContext(Dispatchers.IO) {
         try {
             cleanupSockets()
+            Log.d(TAG, "Starting server socket on port $PORT...")
             serverSocket = ServerSocket(PORT).apply { reuseAddress = true }
-            Log.d(TAG, "Server waiting on port $PORT...")
+            
+            // Wait for client to connect
             val socket = serverSocket?.accept()
-            if (socket != null) setupConnection(socket)
+            if (socket != null && isActive) {
+                Log.i(TAG, "Accepted incoming connection from ${socket.inetAddress.hostAddress}")
+                setupConnection(socket)
+            }
         } catch (e: Exception) {
-            if (isActive) throw e
+            if (isActive) {
+                Log.e(TAG, "Server socket error", e)
+                throw e
+            }
         }
     }
 
     private suspend fun startClient(host: String) = withContext(Dispatchers.IO) {
         cleanupSockets()
-        Log.d(TAG, "Connecting to $host:$PORT...")
+        Log.d(TAG, "Connecting to server at $host:$PORT...")
+        
         // Retry a few times as the server might not be ready yet
         var socket: Socket? = null
-        for (i in 1..5) {
+        var lastEx: Exception? = null
+        
+        for (i in 1..10) {
+            if (!isActive) break
             try {
-                socket = Socket(host, PORT)
+                socket = Socket()
+                socket.connect(InetSocketAddress(host, PORT), 2000)
+                Log.i(TAG, "Successfully connected to $host:$PORT on attempt $i")
                 break
             } catch (e: Exception) {
-                if (i == 5) throw e
+                lastEx = e
+                Log.w(TAG, "Connection attempt $i failed: ${e.message}")
+                socket?.close()
+                socket = null
                 delay(1000L)
             }
         }
-        if (socket != null) setupConnection(socket)
+        
+        if (socket != null && isActive) {
+            setupConnection(socket)
+        } else if (isActive) {
+            throw lastEx ?: Exception("Failed to connect to $host")
+        }
     }
 
     private fun setupConnection(socket: Socket) {
         socket.tcpNoDelay = true
+        socket.keepAlive = true
         clientSocket = socket
         writer = PrintWriter(socket.getOutputStream(), true)
+        
+        Log.i(TAG, "Transport connected. Socket: ${socket.inetAddress.hostAddress}")
         _connectionState.value = ConnectionState.CONNECTED
-        Log.i(TAG, "Socket connected to ${socket.inetAddress.hostAddress}")
+        _lastError.value = null
+        
         startReceiving(socket)
     }
 
@@ -137,23 +186,28 @@ class WiFiDirectTransport(
         receiverJob = transportScope.launch {
             try {
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+                Log.d(TAG, "Receiver thread started")
                 while (isActive) {
                     val line = reader.readLine() ?: break
                     try {
                         val message = Json.decodeFromString<P2PMessage>(line)
                         onMessageReceived?.invoke(message)
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to parse message", e)
+                        Log.w(TAG, "Failed to parse incoming message: ${e.message}")
                     }
                 }
+                Log.i(TAG, "Receiver thread: connection closed by peer")
             } catch (e: Exception) {
                 if (isActive) {
-                    Log.e(TAG, "Receiver error", e)
+                    Log.e(TAG, "Receiver error: ${e.message}")
                     _lastError.value = "Connection lost"
                     _connectionState.value = ConnectionState.ERROR
                 }
             } finally {
-                disconnect()
+                if (isActive) {
+                    Log.d(TAG, "Receiver thread finished, disconnecting")
+                    disconnect()
+                }
             }
         }
     }
@@ -161,12 +215,18 @@ class WiFiDirectTransport(
     override fun getConnectedPeerId(): String? = clientSocket?.inetAddress?.hostAddress
 
     override fun sendMessage(message: P2PMessage) {
+        if (_connectionState.value != ConnectionState.CONNECTED || writer == null) {
+            Log.w(TAG, "Cannot send message: Not connected")
+            return
+        }
+        
         transportScope.launch {
             try {
                 val json = Json.encodeToString(message)
                 writer?.println(json)
+                Log.v(TAG, "Sent message ${message.messageId}")
             } catch (e: Exception) {
-                Log.e(TAG, "Send failed", e)
+                Log.e(TAG, "Failed to send message ${message.messageId}: ${e.message}")
             }
         }
     }
@@ -176,8 +236,12 @@ class WiFiDirectTransport(
     }
 
     override fun disconnect() {
-        Log.d(TAG, "Disconnecting...")
+        Log.i(TAG, "Disconnecting WiFiDirectTransport...")
         _connectionState.value = ConnectionState.DISCONNECTED
+        
+        connectionAttemptJob?.cancel()
+        connectionAttemptJob = null
+        
         transportScope.launch {
             cleanupSockets()
             wifiDirectManager.disconnect()
@@ -185,13 +249,15 @@ class WiFiDirectTransport(
     }
 
     private fun cleanupSockets() {
+        Log.d(TAG, "Cleaning up sockets and streams")
         receiverJob?.cancel()
+        receiverJob = null
         try {
             writer?.close()
             clientSocket?.close()
             serverSocket?.close()
         } catch (e: Exception) {
-            // Ignored
+            Log.w(TAG, "Error during socket cleanup: ${e.message}")
         } finally {
             writer = null
             clientSocket = null
@@ -200,6 +266,7 @@ class WiFiDirectTransport(
     }
 
     fun release() {
+        Log.d(TAG, "Releasing WiFiDirectTransport resources")
         connectionMonitorJob?.cancel()
         transportScope.cancel()
         disconnect()

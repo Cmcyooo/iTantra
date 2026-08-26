@@ -23,7 +23,18 @@ enum class TransceiverState {
 }
 
 /**
- * COORDINATOR: Wires together Audio, VAD, STT, Transport, and TTS.
+ * Delivery status for Emergency Alerts.
+ */
+enum class AlertDeliveryStatus {
+    NONE,
+    SENDING,
+    SENT,
+    DELIVERED,
+    FAILED
+}
+
+/**
+ * COORDINATOR: Wires together Audio, VAD, STT, Transport, Alert Priority Queue, and TTS.
  * This is the primary engine for the iTantra user experience.
  */
 class TransceiverManager(
@@ -33,13 +44,30 @@ class TransceiverManager(
     private val commManager: CommunicationManager,
     private val callSignManager: CallSignManager
 ) {
+    val alertPlaybackManager: AlertPlaybackManager = AlertPlaybackManager(context, ttsManager)
+
     private val _uiState = MutableStateFlow(TransceiverState.IDLE)
     val uiState: StateFlow<TransceiverState> = _uiState.asStateFlow()
+
+    // Mode control: NORMAL vs EMERGENCY
+    private val _isEmergencyMode = MutableStateFlow(false)
+    val isEmergencyMode: StateFlow<Boolean> = _isEmergencyMode.asStateFlow()
+
+    // Outgoing alert delivery tracking
+    private val _alertDeliveryStatus = MutableStateFlow(AlertDeliveryStatus.NONE)
+    val alertDeliveryStatus: StateFlow<AlertDeliveryStatus> = _alertDeliveryStatus.asStateFlow()
+
+    private val _lastAlertText = MutableStateFlow("")
+    val lastAlertText: StateFlow<String> = _lastAlertText.asStateFlow()
+
+    // Active incoming alert exposed from AlertPlaybackManager
+    val activeIncomingAlert: StateFlow<P2PMessage?> = alertPlaybackManager.activeAlert
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     private var lastSentText: String = ""
     private var lastReceivedText: String = ""
+    private var pendingAckAlertId: String? = null
     
     private var pttReleaseTime: Long = 0
 
@@ -62,9 +90,28 @@ class TransceiverManager(
             }
         }
 
+        // Observe Alert playback state
+        scope.launch {
+            alertPlaybackManager.isAlertPlaying.collect { playing ->
+                if (playing) {
+                    _uiState.value = TransceiverState.PLAYING
+                } else if (_uiState.value == TransceiverState.PLAYING) {
+                    _uiState.value = TransceiverState.IDLE
+                }
+            }
+        }
+
         // Observe Incoming Messages
         commManager.setOnMessageReceivedListener { message: P2PMessage ->
             handleIncomingMessage(message)
+        }
+
+        // Observe ACK confirmations
+        commManager.setOnAckReceivedListener { ackedMessageId ->
+            if (pendingAckAlertId != null && pendingAckAlertId == ackedMessageId) {
+                _alertDeliveryStatus.value = AlertDeliveryStatus.DELIVERED
+                Log.i(TAG, "✓ Alert delivery confirmed (ACK received) for $ackedMessageId")
+            }
         }
         
         // Identity exchange on connection
@@ -76,6 +123,14 @@ class TransceiverManager(
                 }
             }
         }
+    }
+
+    fun setEmergencyMode(enabled: Boolean) {
+        _isEmergencyMode.value = enabled
+        if (!enabled) {
+            _alertDeliveryStatus.value = AlertDeliveryStatus.NONE
+        }
+        Log.i(TAG, "Transceiver mode switched to: ${if (enabled) "EMERGENCY" else "NORMAL"}")
     }
 
     private fun updateStateFromAudio(state: AudioState) {
@@ -92,7 +147,11 @@ class TransceiverManager(
             state.sttStatus == SttStatus.COMPLETE && state.recognizedText.isNotEmpty() -> {
                 if (state.recognizedText != lastSentText) {
                     lastSentText = state.recognizedText
-                    sendRecognizedText(state.recognizedText)
+                    if (_isEmergencyMode.value) {
+                        sendRecognizedAlert(state.recognizedText)
+                    } else {
+                        sendRecognizedText(state.recognizedText)
+                    }
                 }
             }
             state.vadStatus == VadStatus.SPEAKING || state.vadStatus == VadStatus.SPEECH_DETECTED -> 
@@ -127,7 +186,11 @@ class TransceiverManager(
         scope.launch {
             val sendStartTime = System.currentTimeMillis()
             _uiState.value = TransceiverState.FORWARDING
-            commManager.sendText(text, senderName = callSignManager.getCallSign())
+            commManager.sendText(
+                text = text,
+                language = audioManager.languageModelManager.currentLanguage.value.code,
+                senderName = callSignManager.getCallSign()
+            )
             val sendEndTime = System.currentTimeMillis()
             Log.d(TAG, "Latency: STT End -> Network Send: ${sendEndTime - sendStartTime}ms")
             
@@ -135,6 +198,49 @@ class TransceiverManager(
             delay(1500.milliseconds) // Show "SENT" for a bit
             if (_uiState.value == TransceiverState.SENT) {
                 _uiState.value = TransceiverState.IDLE
+            }
+        }
+    }
+
+    private fun sendRecognizedAlert(text: String) {
+        scope.launch {
+            val sendStartTime = System.currentTimeMillis()
+            _lastAlertText.value = text
+            _uiState.value = TransceiverState.FORWARDING
+            
+            if (commManager.connectionState.value != ConnectionState.CONNECTED) {
+                Log.w(TAG, "🚨 Alert cannot be delivered: Transport not connected")
+                _alertDeliveryStatus.value = AlertDeliveryStatus.FAILED
+                _uiState.value = TransceiverState.ERROR
+                return@launch
+            }
+
+            _alertDeliveryStatus.value = AlertDeliveryStatus.SENDING
+            try {
+                val sentMsg = commManager.sendAlert(
+                    text = text,
+                    language = audioManager.languageModelManager.currentLanguage.value.code,
+                    senderName = callSignManager.getCallSign()
+                )
+                val sendEndTime = System.currentTimeMillis()
+                Log.i(TAG, "🚨 Emergency alert dispatched to transport: ${sentMsg.messageId} in ${sendEndTime - sendStartTime}ms")
+                
+                pendingAckAlertId = sentMsg.messageId
+                _alertDeliveryStatus.value = AlertDeliveryStatus.SENT
+                _uiState.value = TransceiverState.SENT
+
+                // ACK Timeout watchdog (5 seconds)
+                scope.launch {
+                    delay(5000.milliseconds)
+                    // If still in SENDING or not confirmed, don't falsely claim delivered
+                    if (_alertDeliveryStatus.value == AlertDeliveryStatus.SENDING) {
+                        _alertDeliveryStatus.value = AlertDeliveryStatus.FAILED
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send alert", e)
+                _alertDeliveryStatus.value = AlertDeliveryStatus.FAILED
+                _uiState.value = TransceiverState.ERROR
             }
         }
     }
@@ -157,8 +263,34 @@ class TransceiverManager(
 
             lastReceivedText = message.text
             _uiState.value = TransceiverState.RECEIVING
-            ttsManager.speak(message.text)
+
+            if (message.isAlert) {
+                Log.i(TAG, "🚨 Incoming HIGH-PRIORITY ALERT received: '${message.text}' from ${message.senderName}")
+                
+                // Immediately send ACK packet back to sender
+                commManager.sendAck(message.messageId, senderName = callSignManager.getCallSign())
+                
+                // Dispatch to AlertPlaybackManager
+                alertPlaybackManager.enqueueMessage(message)
+            } else {
+                // Route normal message through AlertPlaybackManager queue
+                alertPlaybackManager.enqueueMessage(message)
+            }
         }
+    }
+
+    /**
+     * Sends recognized alert text (exposed for testing / programmatic alert dispatch).
+     */
+    fun sendAlertMessage(text: String) {
+        sendRecognizedAlert(text)
+    }
+
+    /**
+     * Sends recognized normal text (exposed for testing / programmatic text dispatch).
+     */
+    fun sendNormalMessage(text: String) {
+        sendRecognizedText(text)
     }
 
     /**
@@ -178,6 +310,7 @@ class TransceiverManager(
     }
 
     fun release() {
+        alertPlaybackManager.release()
         scope.cancel()
     }
 }

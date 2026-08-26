@@ -52,6 +52,8 @@ class TtsManager(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    fun isReady(): Boolean = tts != null && _status.value == TtsStatus.IDLE
+
     companion object {
         private const val TAG = "TtsManager"
         private const val MODEL_DIR = "tts-en-amy"
@@ -98,12 +100,102 @@ class TtsManager(private val context: Context) {
     }
 
     /**
-     * Synthesizes the provided text and plays it.
+     * Synthesizes text to GeneratedAudio directly.
      */
-    fun speak(text: String) {
-        if (text.isBlank()) return
+    suspend fun generateSpeech(text: String): GeneratedAudio? = withContext(Dispatchers.IO) {
         val ttsEngine = tts ?: run {
             Log.w(TAG, "TTS engine not initialized.")
+            return@withContext null
+        }
+        try {
+            var generatedAudio: GeneratedAudio? = null
+            val synthesisTimeMs = measureTimeMillis {
+                generatedAudio = ttsEngine.generate(text)
+            }
+            val audio = generatedAudio
+            if (audio != null && audio.samples.isNotEmpty()) {
+                val audioDuration = audio.samples.size.toDouble() / audio.sampleRate
+                val rtf = if (audioDuration > 0) (synthesisTimeMs / 1000.0) / audioDuration else 0.0
+                _lastResult.value = TtsResult(
+                    audioDuration = audioDuration,
+                    synthesisTimeMs = synthesisTimeMs,
+                    firstAudioLatencyMs = synthesisTimeMs,
+                    rtf = rtf
+                )
+            }
+            audio
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in generateSpeech", e)
+            null
+        }
+    }
+
+    /**
+     * Plays audio samples with custom AudioAttributes and completion callback.
+     */
+    fun playAudioWithAttributes(
+        samples: FloatArray,
+        sampleRate: Int,
+        attributes: AudioAttributes,
+        onComplete: () -> Unit
+    ) {
+        stopPlaybackInternal()
+        _status.value = TtsStatus.PLAYING
+
+        try {
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(attributes)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(samples.size * 4)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+
+            audioTrack = track
+
+            track.apply {
+                write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
+                setNotificationMarkerPosition(samples.size)
+                setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+                    override fun onMarkerReached(track: AudioTrack?) {
+                        Log.d(TAG, "playAudioWithAttributes reached marker.")
+                        _status.value = TtsStatus.COMPLETE
+                        scope.launch {
+                            delay(500)
+                            if (_status.value == TtsStatus.COMPLETE) {
+                                _status.value = TtsStatus.IDLE
+                            }
+                        }
+                        stopPlaybackInternal()
+                        onComplete()
+                    }
+                    override fun onPeriodicNotification(track: AudioTrack?) {}
+                })
+                play()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "playAudioWithAttributes error", e)
+            _status.value = TtsStatus.ERROR
+            onComplete()
+        }
+    }
+
+    /**
+     * Synthesizes the provided text and plays it.
+     */
+    fun speak(text: String, onComplete: (() -> Unit)? = null) {
+        if (text.isBlank()) {
+            onComplete?.invoke()
+            return
+        }
+        val ttsEngine = tts ?: run {
+            Log.w(TAG, "TTS engine not initialized.")
+            onComplete?.invoke()
             return
         }
 
@@ -122,6 +214,7 @@ class TtsManager(private val context: Context) {
                 if (audio == null || audio.samples.isEmpty()) {
                     Log.e(TAG, "Synthesis failed or produced no samples.")
                     _status.value = TtsStatus.ERROR
+                    onComplete?.invoke()
                     return@launch
                 }
 
@@ -137,11 +230,12 @@ class TtsManager(private val context: Context) {
 
                 Log.d(TAG, "Synthesis complete. Duration: ${"%.2f".format(audioDuration)}s, Time: ${synthesisTimeMs}ms, RTF: ${"%.3f".format(rtf)}")
 
-                playAudio(audio.samples, audio.sampleRate)
+                playAudio(audio.samples, audio.sampleRate, onComplete)
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error during speech synthesis", e)
                 _status.value = TtsStatus.ERROR
+                onComplete?.invoke()
             }
         }
     }
@@ -173,7 +267,7 @@ class TtsManager(private val context: Context) {
         }
     }
 
-    private fun playAudio(samples: FloatArray, sampleRate: Int) {
+    private fun playAudio(samples: FloatArray, sampleRate: Int, onComplete: (() -> Unit)? = null) {
         _status.value = TtsStatus.PLAYING
         
         try {
@@ -211,6 +305,7 @@ class TtsManager(private val context: Context) {
                             }
                         }
                         stopPlaybackInternal()
+                        onComplete?.invoke()
                     }
                     override fun onPeriodicNotification(track: AudioTrack?) {}
                 })
@@ -219,6 +314,7 @@ class TtsManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Playback error", e)
             _status.value = TtsStatus.ERROR
+            onComplete?.invoke()
         }
     }
 

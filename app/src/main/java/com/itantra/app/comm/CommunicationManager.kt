@@ -84,18 +84,74 @@ class CommunicationManager(initialTransport: Transport) {
 
     fun getConnectedPeerId(): String? = _transport.getConnectedPeerId()
 
-    fun sendText(text: String, language: String = "en", senderName: String? = null) {
+    fun sendText(text: String, language: String = "en", senderName: String? = null): P2PMessage {
         val message = P2PMessage(
             messageId = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
             language = language,
             text = text,
-            senderName = senderName
+            senderName = senderName,
+            messageType = P2PMessage.MESSAGE_TYPE_NORMAL,
+            priority = P2PMessage.PRIORITY_NORMAL
         )
-        _transport.sendMessage(message)
+        try {
+            _transport.sendMessage(message)
+        } catch (e: Exception) {
+            Log.e(TAG, "Transport send failed", e)
+            _lastError.value = "Send failed: ${e.message}"
+        }
         
         // Add local message to list for UI
         addMessageToList(message)
+        return message
+    }
+
+    /**
+     * Sends a HIGH-priority Emergency Alert message.
+     */
+    fun sendAlert(text: String, language: String = "en", senderName: String? = null): P2PMessage {
+        val message = P2PMessage(
+            messageId = UUID.randomUUID().toString(),
+            timestamp = System.currentTimeMillis(),
+            language = language,
+            text = text,
+            senderName = senderName,
+            messageType = P2PMessage.MESSAGE_TYPE_ALERT,
+            priority = P2PMessage.PRIORITY_HIGH
+        )
+        try {
+            _transport.sendMessage(message)
+        } catch (e: Exception) {
+            Log.e(TAG, "Transport sendAlert failed", e)
+            _lastError.value = "Alert send failed: ${e.message}"
+        }
+        addMessageToList(message)
+        return message
+    }
+
+    /**
+     * Sends an ACK for a received message.
+     */
+    fun sendAck(targetMessageId: String, senderName: String? = null) {
+        val ackMessage = P2PMessage(
+            messageId = UUID.randomUUID().toString(),
+            timestamp = System.currentTimeMillis(),
+            text = targetMessageId,
+            senderName = senderName,
+            messageType = P2PMessage.MESSAGE_TYPE_ACK,
+            priority = P2PMessage.PRIORITY_HIGH
+        )
+        try {
+            _transport.sendMessage(ackMessage)
+        } catch (e: Exception) {
+            Log.e(TAG, "Transport sendAck failed", e)
+        }
+    }
+
+    private var onAckReceivedListener: ((String) -> Unit)? = null
+
+    fun setOnAckReceivedListener(listener: (String) -> Unit) {
+        this.onAckReceivedListener = listener
     }
 
     fun setOnMessageReceivedListener(listener: (P2PMessage) -> Unit) {
@@ -107,8 +163,14 @@ class CommunicationManager(initialTransport: Transport) {
             val now = System.currentTimeMillis()
             val transportLatency = now - message.timestamp
             _latency.value = transportLatency
+
+            if (message.isAck) {
+                Log.d(TAG, "Received ACK for message: ${message.text}")
+                onAckReceivedListener?.invoke(message.text)
+                return@launch
+            }
             
-            Log.d(TAG, "Received message: ${message.text}, Latency: ${transportLatency}ms")
+            Log.d(TAG, "Received message: ${message.text} [type=${message.messageType}, priority=${message.priority}], Latency: ${transportLatency}ms")
             
             _lastMessage.value = message
             addMessageToList(message)
