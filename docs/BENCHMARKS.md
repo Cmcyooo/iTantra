@@ -29,5 +29,17 @@
 * **First-audio Latency**: ~300ms (for ~2s audio)
 * **Synthesis Time (Short)**: ~300ms
 
+## Transport Performance (Phase 5)
+* **Mechanism**: Local TCP Sockets (Wi-Fi/Hotspot)
+* **Message Payload Size**: ~150-300 bytes (JSON)
+* **Transport Latency (Avg)**: ~2-15ms (Tested on local Wi-Fi)
+
+## End-to-End Latency (Phase 6)
+* **Path**: Phone A (Speech) -> STT -> Network -> Phone B (Text) -> TTS -> Audio
+* **STT Time**: ~300-500ms
+* **Network Time**: < 15ms
+* **TTS Time**: ~300-400ms
+* **Approx. Total**: ~600-900ms (Excellent for real-time interaction)
+
 ## Battery Impact
 * **Energy Consumption per hour of active use**: TBD

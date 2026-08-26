@@ -2,38 +2,52 @@ package com.itantra.app.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.core.content.ContextCompat
 import com.itantra.app.audio.*
+import com.itantra.app.comm.*
+import kotlinx.coroutines.delay
 
-/**
- * A simple test screen for microphone capture and TTS.
- * Displays real-time stats and handles permissions.
- */
 @Composable
 fun MicrophoneTestScreen(
     audioManager: AudioCaptureManager,
-    ttsManager: TtsManager
+    ttsManager: TtsManager,
+    commManager: CommunicationManager,
+    transceiverManager: TransceiverManager
 ) {
     val context = LocalContext.current
     val audioState by audioManager.state.collectAsState()
-    val ttsStatus by ttsManager.status.collectAsState()
-    val ttsResult by ttsManager.lastResult.collectAsState()
+    val commState by commManager.connectionState.collectAsState()
+    val commMessages by commManager.messages.collectAsState()
+    val transceiverState by transceiverManager.uiState.collectAsState()
     
-    var ttsText by remember { mutableStateOf("Hello, this is iTantra.") }
+    var showSettings by remember { mutableStateOf(false) }
+    var targetIp by remember { mutableStateOf("") }
+    
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -43,7 +57,6 @@ fun MicrophoneTestScreen(
         )
     }
 
-    // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -55,11 +68,62 @@ fun MicrophoneTestScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // --- HEADER ---
+        HeaderSection(commState)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- PTT CONTROL ---
+        PTTSection(
+            state = transceiverState,
+            hasPermission = hasPermission,
+            onStartTalk = { transceiverManager.startTalk() },
+            onStopTalk = { transceiverManager.stopTalk() },
+            onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // --- TRANSCRIPT SECTION ---
+        TranscriptSection(audioState, commMessages.lastOrNull())
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- PERFORMANCE CARD ---
+        PerformanceSection(audioState, ttsManager, commManager)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- SETTINGS TOGGLE ---
+        OutlinedButton(
+            onClick = { showSettings = !showSettings },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(if (showSettings) "HIDE SETTINGS" else "CONNECTION SETTINGS")
+        }
+
+        AnimatedVisibility(visible = showSettings) {
+            SettingsSection(
+                commState = commState,
+                targetIp = targetIp,
+                onIpChange = { targetIp = it },
+                onConnect = { commManager.connect(targetIp.takeIf { it.isNotBlank() }) },
+                onDisconnect = { commManager.disconnect() }
+            )
+        }
+    }
+}
+
+@Composable
+fun HeaderSection(commState: ConnectionState) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "iTantra",
             fontSize = 32.sp,
@@ -67,216 +131,219 @@ fun MicrophoneTestScreen(
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Microphone Test",
-            fontSize = 20.sp,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                StatusItem(
-                    label = "Microphone Permission:",
-                    value = if (hasPermission) "GRANTED" else "NOT GRANTED",
-                    valueColor = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                )
-                
-                StatusItem(
-                    label = "Recording Status:",
-                    value = if (audioState.isRecording) "RECORDING" else "IDLE",
-                    valueColor = if (audioState.isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-                )
-                
-                StatusItem(
-                    label = "VAD Status:",
-                    value = audioState.vadStatus.name,
-                    valueColor = when (audioState.vadStatus) {
-                        VadStatus.SILENCE -> MaterialTheme.colorScheme.secondary
-                        VadStatus.SPEECH_DETECTED, 
-                        VadStatus.SPEAKING -> MaterialTheme.colorScheme.primary
-                        VadStatus.SPEECH_ENDED -> MaterialTheme.colorScheme.tertiary
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                StatusItem(
-                    label = "PCM Samples:", 
-                    value = audioState.sampleCount.toString()
-                )
-                StatusItem(
-                    label = "Captured Duration:", 
-                    value = "%.2f seconds".format(audioState.durationSeconds)
-                )
-                StatusItem(
-                    label = "Audio Level (RMS):", 
-                    value = "%.0f".format(audioState.rms)
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                StatusItem(
-                    label = "STT Status:",
-                    value = audioState.sttStatus.name,
-                    valueColor = when (audioState.sttStatus) {
-                        com.itantra.app.audio.SttStatus.IDLE -> MaterialTheme.colorScheme.secondary
-                        com.itantra.app.audio.SttStatus.SPEECH_DETECTED -> MaterialTheme.colorScheme.primary
-                        com.itantra.app.audio.SttStatus.TRANSCRIBING -> MaterialTheme.colorScheme.tertiary
-                        com.itantra.app.audio.SttStatus.COMPLETE -> MaterialTheme.colorScheme.primary
-                        com.itantra.app.audio.SttStatus.ERROR -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-
-                if (audioState.recognizedText.isNotEmpty()) {
-                    Text(
-                        text = "Recognized Text:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Text(
-                        text = audioState.recognizedText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
-
-                audioState.lastSttResult?.let { res ->
-                    Text(
-                        text = "Last Inference: Proc: ${res.processingTimeMs}ms, RTF: ${"%.3f".format(res.rtf)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        if (!hasPermission) {
-            Button(
-                onClick = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("GRANT MICROPHONE PERMISSION")
-            }
-        } else {
-            if (audioState.isRecording) {
-                Button(
-                    onClick = { audioManager.stopRecording() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("STOP RECORDING")
-                }
-            } else {
-                Button(
-                    onClick = { audioManager.startRecording() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("START RECORDING")
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "Audio format: 16 kHz, Mono, PCM 16-bit",
-            style = MaterialTheme.typography.bodySmall,
+            text = "Offline Voice Transceiver",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        Text(
-            text = "Text-to-Speech Test",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(vertical = 12.dp)
-        )
-
-        OutlinedTextField(
-            value = ttsText,
-            onValueChange = { ttsText = it },
-            label = { Text("Text to Speak") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 3
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Surface(
+            shape = CircleShape,
+            color = when (commState) {
+                ConnectionState.CONNECTED -> Color(0xFF4CAF50).copy(alpha = 0.1f)
+                ConnectionState.CONNECTING -> Color(0xFFFFC107).copy(alpha = 0.1f)
+                else -> Color(0xFFF44336).copy(alpha = 0.1f)
+            },
+            modifier = Modifier.padding(top = 4.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                StatusItem(
-                    label = "TTS Status:",
-                    value = ttsStatus.name,
-                    valueColor = when (ttsStatus) {
-                        TtsStatus.IDLE -> MaterialTheme.colorScheme.secondary
-                        TtsStatus.LOADING -> MaterialTheme.colorScheme.tertiary
-                        TtsStatus.SYNTHESIZING -> MaterialTheme.colorScheme.primary
-                        TtsStatus.PLAYING -> MaterialTheme.colorScheme.primary
-                        TtsStatus.COMPLETE -> MaterialTheme.colorScheme.secondary
-                        TtsStatus.ERROR -> MaterialTheme.colorScheme.error
-                    }
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (commState) {
+                                ConnectionState.CONNECTED -> Color(0xFF4CAF50)
+                                ConnectionState.CONNECTING -> Color(0xFFFFC107)
+                                else -> Color(0xFFF44336)
+                            }
+                        )
                 )
-
-                ttsResult?.let { res ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    StatusItem(label = "Synthesis Time:", value = "${res.synthesisTimeMs} ms")
-                    StatusItem(label = "Audio Duration:", value = "%.2f s".format(res.audioDuration))
-                    StatusItem(label = "RTF:", value = "%.3f".format(res.rtf))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = { ttsManager.speak(ttsText) },
-                modifier = Modifier.weight(1f),
-                enabled = ttsStatus != TtsStatus.LOADING && ttsStatus != TtsStatus.SYNTHESIZING
-            ) {
-                Text("🔊 SPEAK")
-            }
-            Button(
-                onClick = { ttsManager.stop() },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                enabled = ttsStatus == TtsStatus.PLAYING
-            ) {
-                Text("■ STOP")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = commState.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
 @Composable
-fun StatusItem(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
-    Row(
+fun PTTSection(
+    state: TransceiverState,
+    hasPermission: Boolean,
+    onStartTalk: () -> Unit,
+    onStopTalk: () -> Unit,
+    onRequestPermission: () -> Unit
+) {
+    val isPressed = state == TransceiverState.LISTENING || state == TransceiverState.SPEAKING
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = when (state) {
+                TransceiverState.IDLE -> "READY"
+                TransceiverState.LISTENING -> "LISTENING..."
+                TransceiverState.SPEAKING -> "SPEAKING..."
+                TransceiverState.TRANSCRIBING -> "TRANSCRIBING..."
+                TransceiverState.SENDING -> "SENDING..."
+                TransceiverState.RECEIVING -> "RECEIVING..."
+                TransceiverState.PLAYING -> "🔊 PLAYING"
+                TransceiverState.ERROR -> "ERROR"
+            },
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isPressed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Box(
+            modifier = Modifier
+                .size(160.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isPressed) MaterialTheme.colorScheme.errorContainer 
+                    else MaterialTheme.colorScheme.primaryContainer
+                )
+                .pointerInput(hasPermission) {
+                    if (!hasPermission) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Press) {
+                                onStartTalk()
+                            } else if (event.type == PointerEventType.Release) {
+                                onStopTalk()
+                            }
+                        }
+                    }
+                }
+                .then(if (!hasPermission) Modifier.clickable { onRequestPermission() } else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = "Talk",
+                modifier = Modifier.size(64.dp),
+                tint = if (isPressed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = if (!hasPermission) "Tap to grant permission" else "HOLD TO TALK",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun TranscriptSection(audioState: AudioState, lastMessage: P2PMessage?) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("You said:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = audioState.recognizedText.ifEmpty { "..." },
+                style = MaterialTheme.typography.bodyLarge,
+                minLines = 2
+            )
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            
+            Text("Incoming:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+            Text(
+                text = lastMessage?.text ?: "...",
+                style = MaterialTheme.typography.bodyLarge,
+                minLines = 2
+            )
+        }
+    }
+}
+
+@Composable
+fun PerformanceSection(audioState: AudioState, ttsManager: TtsManager, commManager: CommunicationManager) {
+    val ttsResult by ttsManager.lastResult.collectAsState()
+    val commLatency by commManager.latency.collectAsState()
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            PerformanceItem("STT", "${audioState.lastSttResult?.processingTimeMs ?: 0}ms")
+            PerformanceItem("Net", "${commLatency ?: 0}ms")
+            PerformanceItem("TTS", "${ttsResult?.synthesisTimeMs ?: 0}ms")
+        }
+    }
+}
+
+@Composable
+fun PerformanceItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun SettingsSection(
+    commState: ConnectionState,
+    targetIp: String,
+    onIpChange: (String) -> Unit,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(top = 16.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+            .padding(16.dp)
     ) {
-        Text(text = label, fontWeight = FontWeight.Medium)
-        Text(text = value, color = valueColor, fontWeight = FontWeight.Bold)
+        Text("Network Configuration", style = MaterialTheme.typography.titleSmall)
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        OutlinedTextField(
+            value = targetIp,
+            onValueChange = onIpChange,
+            label = { Text("Target IP (Leave blank for Host)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = commState == ConnectionState.DISCONNECTED
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onConnect,
+                modifier = Modifier.weight(1f),
+                enabled = commState == ConnectionState.DISCONNECTED || commState == ConnectionState.ERROR
+            ) {
+                Text(if (targetIp.isBlank()) "HOST" else "CONNECT")
+            }
+            Button(
+                onClick = onDisconnect,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                enabled = commState != ConnectionState.DISCONNECTED
+            ) {
+                Text("DISCONNECT")
+            }
+        }
     }
 }

@@ -18,6 +18,10 @@ class MainActivity : ComponentActivity() {
     // Instantiate managers at the activity level
     private val audioManager by lazy { AudioCaptureManager(this) }
     private val ttsManager by lazy { com.itantra.app.audio.TtsManager(this) }
+    private val commManager by lazy { com.itantra.app.comm.CommunicationManager(com.itantra.app.comm.WiFiTransport()) }
+    private val transceiverManager by lazy { 
+        com.itantra.app.comm.TransceiverManager(this, audioManager, ttsManager, commManager) 
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +33,9 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(innerPadding)) {
                         MicrophoneTestScreen(
                             audioManager = audioManager,
-                            ttsManager = ttsManager
+                            ttsManager = ttsManager,
+                            commManager = commManager,
+                            transceiverManager = transceiverManager
                         )
                     }
                 }
@@ -42,5 +48,7 @@ class MainActivity : ComponentActivity() {
         // Ensure resources are released when the activity is destroyed
         audioManager.release()
         ttsManager.release()
+        commManager.disconnect()
+        transceiverManager.release()
     }
 }

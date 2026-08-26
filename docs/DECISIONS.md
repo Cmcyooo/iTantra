@@ -18,8 +18,14 @@
 * **AudioTrack (Static Mode)**: Used for audio playback. PCM float samples are written to a static buffer for low-overhead playback. Track is explicitly released after each use or on interruption to prevent resource exhaustion.
 
 ## UI/Interaction
-* **Scrollable Layout**: Main test screen uses a scrollable `Column` with `Arrangement.Top` to prevent element overlap on smaller screens or when many controls are visible.
-* **State Feedback**: TTS state machine explicitly transitions through LOADING, SYNTHESIZING, PLAYING, and COMPLETE to provide clear user feedback.
+* **Push-to-Talk (PTT)**: Implemented as the primary interaction model. Users hold a large central button to record, and release to trigger STT and transmission.
+* **Automated Reception**: Incoming text messages automatically trigger TTS synthesis and playback, fulfilling the radio-like transceiver requirement.
+* **Separated Settings**: Network configuration is moved to an expandable section to maintain focus on the core communication flow.
+
+## Text Transport
+* **Local TCP Sockets**: Chosen for Phase 5 to enable reliable, server-less communication on a local Wi-Fi or Hotspot network. Simple socket logic avoids heavy frameworks and works on all Android versions.
+* **Host/Client Roles**: To simplify connection without complex discovery (NSD), one device acts as Host (Server) and the other as Client (requires manual IP entry).
+* **Message Model**: JSON-serialized `P2PMessage` containing ID, timestamp, language, and text.
 
 ## Native Model Loading
 * **Asset Compression**: Disabled compression for `.onnx` files in `app/build.gradle.kts` using `androidResources.noCompress`. This is critical as ONNX Runtime needs to memory-map the model file directly from the APK assets, which fails if the file is compressed (deflated).
