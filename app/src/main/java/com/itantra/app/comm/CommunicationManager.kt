@@ -50,6 +50,10 @@ class CommunicationManager(initialTransport: Transport) {
         transportJob?.cancel()
         
         _transport = newTransport
+        // Immediately sync state with the new transport to avoid UI flicker or stale states
+        _connectionState.value = newTransport.connectionState.value
+        _lastError.value = newTransport.lastError.value
+        
         observeTransport(_transport)
         
         Log.i(TAG, "Switched transport to: ${newTransport::class.java.simpleName}")

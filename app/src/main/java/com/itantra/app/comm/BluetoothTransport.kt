@@ -51,27 +51,51 @@ class BluetoothTransport : Transport {
             return
         }
         
-        if (_connectionState.value != ConnectionState.DISCONNECTED) return
+        val isHosting = targetId.isNullOrBlank()
         
-        _connectionState.value = ConnectionState.CONNECTING
+        if (!isHosting) {
+            // Client mode: Only allow if disconnected or failed
+            if (_connectionState.value == ConnectionState.CONNECTED || _connectionState.value == ConnectionState.CONNECTING) {
+                Log.w(TAG, "[BT-DIAG] Ignoring connect request: already in state ${_connectionState.value}")
+                return
+            }
+            _connectionState.value = ConnectionState.CONNECTING
+        } else {
+            // Host mode: Don't set CONNECTING state so the UI remains responsive for outbound connects.
+            if (_connectionState.value == ConnectionState.CONNECTED) return
+        }
+        
         _lastError.value = null
 
         transportScope.launch {
             try {
-                if (targetId.isNullOrBlank()) {
+                if (isHosting) {
                     // Host mode: Start BluetoothServerSocket
                     Log.i(TAG, "[BT-DIAG] Connect request: Host mode (Listening for incoming RFCOMM)...")
                     startServer()
                 } else {
-                    // Client mode: Connect to BluetoothDevice address
-                    Log.i(TAG, "[BT-DIAG] Connect request: Client mode connecting to $targetId...")
-                    startClient(targetId)
+                    // Client mode: Connect to BluetoothDevice address with 10s timeout per Phase 12A
+                    withTimeout(10000L) {
+                        Log.i(TAG, "[BT-DIAG] Connect request: Client mode connecting to $targetId...")
+                        startClient(targetId)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "[BT-DIAG] Connection failed: ${e.message}", e)
-                _lastError.value = e.message
-                _connectionState.value = ConnectionState.ERROR
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "[BT-DIAG] Connection timed out after 10s")
+                _lastError.value = "Connection timed out"
+                if (!isHosting) {
+                    _connectionState.value = ConnectionState.ERROR
+                }
                 cleanup()
+            } catch (e: Exception) {
+                if (isActive) {
+                    Log.e(TAG, "[BT-DIAG] Connection failed: ${e.message}", e)
+                    _lastError.value = e.message
+                    if (!isHosting) {
+                        _connectionState.value = ConnectionState.ERROR
+                    }
+                    cleanup()
+                }
             }
         }
     }

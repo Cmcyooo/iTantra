@@ -100,10 +100,11 @@ class WiFiDirectTransport(
 
     override fun connect(targetId: String?) {
         Log.i(TAG, "[P2P-DIAG] Connect requested. Target: ${targetId ?: "LISTEN"}")
-        _connectionState.value = ConnectionState.CONNECTING
-        _lastError.value = null
         
         if (targetId != null) {
+            _connectionState.value = ConnectionState.CONNECTING
+            _lastError.value = null
+            
             val peer = wifiDirectManager.peers.value.find { it.deviceAddress == targetId }
             if (peer != null) {
                 wifiDirectManager.connect(peer)
@@ -113,6 +114,8 @@ class WiFiDirectTransport(
                 _connectionState.value = ConnectionState.ERROR
             }
         } else {
+            // Start discovery - this is not an active connection attempt yet, 
+            // so we keep state as DISCONNECTED to keep UI buttons enabled.
             Log.d(TAG, "[P2P-DIAG] No target ID, starting discovery to wait for incoming connections")
             wifiDirectManager.startDiscovery()
         }

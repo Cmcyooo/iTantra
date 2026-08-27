@@ -76,6 +76,8 @@ class LanguageModelManager(private val context: Context) {
 
         // 2. Prepare new engine instance
         _lifecycleState.value = ModelLifecycleState.LOADING
+        Log.i(TAG, "[STT-ROUTING] language=${targetLanguage.code} engineType=${targetLanguage.engineType} model=${targetLanguage.modelAssetPath}")
+        
         val newEngine = when (targetLanguage.engineType) {
             SttEngineType.SHERPA_ONNX_WHISPER -> SherpaOnnxSttEngine(targetLanguage)
             SttEngineType.GENERIC_ONNX_CTC -> GenericOnnxCtcSttEngine(targetLanguage)

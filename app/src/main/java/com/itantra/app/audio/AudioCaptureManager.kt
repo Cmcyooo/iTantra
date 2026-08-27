@@ -65,6 +65,15 @@ class AudioCaptureManager(private val context: Context) {
     private val pttAccumulator = mutableListOf<FloatArray>()
     private var pttSamplesCount = 0
 
+    // Monotonic timing for latency diagnostics (Phase 12A)
+    var tPttPressNano: Long = 0L
+    var tAudioRecordStartNano: Long = 0L
+    var tVadSpeechStartNano: Long = 0L
+    var tVadSpeechEndNano: Long = 0L
+    var tPttReleaseNano: Long = 0L
+    var tSttStartNano: Long = 0L
+    var tSttEndNano: Long = 0L
+
     // Standard 16 kHz, Mono, 16-bit PCM configuration
     val sampleRate = 16000
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -93,6 +102,13 @@ class AudioCaptureManager(private val context: Context) {
     fun startRecording() {
         if (_state.value.isRecording) return
         
+        tPttPressNano = System.nanoTime()
+        tVadSpeechStartNano = 0L
+        tVadSpeechEndNano = 0L
+        tPttReleaseNano = 0L
+        tSttStartNano = 0L
+        tSttEndNano = 0L
+
         // Initialize VAD if not already done
         if (vadManager == null) {
             vadManager = VadManager(context)
@@ -136,6 +152,7 @@ class AudioCaptureManager(private val context: Context) {
             }
 
             record.startRecording()
+            tAudioRecordStartNano = System.nanoTime()
             if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                 Log.e(TAG, "AudioRecord failed to start recording.")
                 record.release()
@@ -179,7 +196,9 @@ class AudioCaptureManager(private val context: Context) {
         val buffer = ShortArray(CHUNK_SIZE_SAMPLES)
         var totalSamples = 0L
         var lastUiUpdateTime = SystemClock.uptimeMillis()
+        var lastDiagLogTime = SystemClock.uptimeMillis()
         var latestRms = 0.0
+        var peakAmplitude = 0
 
         try {
             while (currentCoroutineContext().isActive && _state.value.isRecording) {
@@ -187,7 +206,15 @@ class AudioCaptureManager(private val context: Context) {
 
                 if (readCount > 0) {
                     totalSamples += readCount
+                    
+                    // Track peak for diagnostics
+                    for (i in 0 until readCount) {
+                        val absVal = kotlin.math.abs(buffer[i].toInt())
+                        if (absVal > peakAmplitude) peakAmplitude = absVal
+                    }
+                    
                     latestRms = calculateRms(buffer, readCount)
+                    val latestRmsNorm = latestRms / 32768.0
                     
                     // Convert PCM16 chunk to Float for accumulation - Reuse buffer if possible
                     val floatChunk = FloatArray(readCount)
@@ -202,7 +229,23 @@ class AudioCaptureManager(private val context: Context) {
                     }
 
                     // Process VAD with the float chunk we just converted
-                    val currentVadStatus = vadManager?.process(floatChunk) ?: VadStatus.SILENCE
+                    val vm = vadManager
+                    if (vm == null) {
+                        Log.e(TAG, "[PTT-DIAG] VAD Manager is null during capture loop!")
+                    }
+                    val vadResult = vm?.processWithProbability(floatChunk)
+                    val currentVadStatus = vadResult?.status ?: VadStatus.SILENCE
+                    val vadProbability = vadResult?.probability ?: 0.0f
+
+                    // Log [PTT-VAD] diagnostic log per Phase 12A specification
+                    Log.i(TAG, "[PTT-VAD] chunkSamples=$readCount rms=${String.format(java.util.Locale.US, "%.2f", latestRms)} rmsNorm=${String.format(java.util.Locale.US, "%.4f", latestRmsNorm)} vadProbability=${String.format(java.util.Locale.US, "%.3f", vadProbability)} state=$currentVadStatus")
+
+                    if ((currentVadStatus == VadStatus.SPEECH_DETECTED || currentVadStatus == VadStatus.SPEAKING) && tVadSpeechStartNano == 0L) {
+                        tVadSpeechStartNano = System.nanoTime()
+                    }
+                    if (currentVadStatus == VadStatus.SPEECH_ENDED && tVadSpeechEndNano == 0L) {
+                        tVadSpeechEndNano = System.nanoTime()
+                    }
 
                     // Handle speech accumulation and STT triggering
                     handleSpeechTransitions(currentVadStatus, floatChunk)
@@ -212,6 +255,14 @@ class AudioCaptureManager(private val context: Context) {
 
                     // Throttle UI state updates to ~10 Hz to prevent excessive recompositions
                     val now = SystemClock.uptimeMillis()
+                    
+                    // Periodically log aggregate metrics every 1 second
+                    if (now - lastDiagLogTime >= 1000L) {
+                        Log.i(TAG, "[PTT-AUDIO] samples=$totalSamples rms=${String.format("%.2f", latestRms)} rms_norm=${String.format("%.4f", latestRmsNorm)} peak=$peakAmplitude duration=${String.format("%.2f", totalSamples.toDouble()/sampleRate)}s")
+                        lastDiagLogTime = now
+                        peakAmplitude = 0 // Reset peak for next interval
+                    }
+
                     if (now - lastUiUpdateTime >= UI_UPDATE_INTERVAL_MS) {
                         lastUiUpdateTime = now
                         _state.value = _state.value.copy(
@@ -232,6 +283,8 @@ class AudioCaptureManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Exception in audio capture loop", e)
         } finally {
+            val finalRmsNorm = latestRms / 32768.0
+            Log.i(TAG, "[PTT-AUDIO-FINAL] samples=$totalSamples rms=${String.format("%.2f", latestRms)} rms_norm=${String.format("%.4f", finalRmsNorm)} peak=$peakAmplitude duration=${String.format("%.2f", totalSamples.toDouble()/sampleRate)}s")
             Log.d(TAG, "Audio capture loop finished. Total samples: $totalSamples")
             // Final state sync with exact sample count and duration
             _state.value = _state.value.copy(
@@ -252,6 +305,7 @@ class AudioCaptureManager(private val context: Context) {
     fun stopRecording(forceFinalize: Boolean = false) {
         if (!_state.value.isRecording && audioRecord == null) return
 
+        tPttReleaseNano = System.nanoTime()
         Log.d(TAG, "stopRecording(forceFinalize=$forceFinalize)")
         _state.value = _state.value.copy(isRecording = false)
         
@@ -396,14 +450,129 @@ class AudioCaptureManager(private val context: Context) {
         return result
     }
 
+    data class SttAudioMetrics(
+        val sampleCount: Int,
+        val duration: Double,
+        val rms: Double,
+        val peak: Double,
+        val leadingSilence: Double,
+        val trailingSilence: Double
+    )
+
+    fun analyzeSttAudio(samples: FloatArray): SttAudioMetrics {
+        val sampleCount = samples.size
+        val duration = sampleCount.toDouble() / sampleRate
+        var sumSquares = 0.0
+        var peak = 0.0f
+        for (s in samples) {
+            val absVal = kotlin.math.abs(s)
+            if (absVal > peak) peak = absVal
+            sumSquares += s * s
+        }
+        val rms = if (sampleCount > 0) sqrt(sumSquares / sampleCount) else 0.0
+
+        val frameSize = 160 // 10ms at 16kHz
+        val silenceThreshold = 0.01
+        val numFrames = sampleCount / frameSize
+
+        var leadingFrames = 0
+        for (i in 0 until numFrames) {
+            var fSum = 0.0
+            for (j in 0 until frameSize) {
+                val s = samples[i * frameSize + j]
+                fSum += s * s
+            }
+            if (sqrt(fSum / frameSize) < silenceThreshold) {
+                leadingFrames++
+            } else {
+                break
+            }
+        }
+        val leadingSilence = leadingFrames * (frameSize.toDouble() / sampleRate)
+
+        var trailingFrames = 0
+        for (i in (numFrames - 1) downTo 0) {
+            var fSum = 0.0
+            for (j in 0 until frameSize) {
+                val s = samples[i * frameSize + j]
+                fSum += s * s
+            }
+            if (sqrt(fSum / frameSize) < silenceThreshold) {
+                trailingFrames++
+            } else {
+                break
+            }
+        }
+        val trailingSilence = trailingFrames * (frameSize.toDouble() / sampleRate)
+
+        return SttAudioMetrics(sampleCount, duration, rms, peak.toDouble(), leadingSilence, trailingSilence)
+    }
+
+    fun saveDebugWav(context: Context, samples: FloatArray, filename: String = "debug_stt_capture.wav"): java.io.File {
+        val file = java.io.File(context.filesDir, filename)
+        val channels = 1
+        val bitsPerSample = 16
+        val byteRate = sampleRate * channels * bitsPerSample / 8
+        val blockAlign = channels * bitsPerSample / 8
+        val dataSize = samples.size * 2
+        val chunkSize = 36 + dataSize
+
+        java.io.FileOutputStream(file).use { fos ->
+            val header = java.nio.ByteBuffer.allocate(44).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            header.put("RIFF".toByteArray())
+            header.putInt(chunkSize)
+            header.put("WAVE".toByteArray())
+            header.put("fmt ".toByteArray())
+            header.putInt(16)
+            header.putShort(1.toShort())
+            header.putShort(channels.toShort())
+            header.putInt(sampleRate)
+            header.putInt(byteRate)
+            header.putShort(blockAlign.toShort())
+            header.putShort(bitsPerSample.toShort())
+            header.put("data".toByteArray())
+            header.putInt(dataSize)
+            fos.write(header.array())
+
+            val pcmBuffer = java.nio.ByteBuffer.allocate(samples.size * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            for (s in samples) {
+                val clamped = s.coerceIn(-1.0f, 1.0f)
+                pcmBuffer.putShort((clamped * 32767.0f).toInt().toShort())
+            }
+            fos.write(pcmBuffer.array())
+        }
+        Log.i(TAG, "[DEBUG-WAV] Saved exact STT buffer to ${file.absolutePath} (${file.length()} bytes)")
+        return file
+    }
+
     private fun runStt(samples: FloatArray) {
         scope.launch {
-            Log.i(TAG, "[PTT-DIAG] STT transcription started (${samples.size} samples)")
+            val metrics = analyzeSttAudio(samples)
+            // Log [PTT-STT-AUDIO] per Phase 12A specification
+            Log.i(TAG, "[PTT-STT-AUDIO] sampleCount=${metrics.sampleCount} duration=${String.format(java.util.Locale.US, "%.2f", metrics.duration)}s rms=${String.format(java.util.Locale.US, "%.4f", metrics.rms)} peak=${String.format(java.util.Locale.US, "%.4f", metrics.peak)} leadingSilence=${String.format(java.util.Locale.US, "%.2f", metrics.leadingSilence)}s trailingSilence=${String.format(java.util.Locale.US, "%.2f", metrics.trailingSilence)}s")
+
+            // Save debug WAV for controlled debug inspection (requirement 6)
+            try {
+                saveDebugWav(context, samples, "debug_stt_capture.wav")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to save debug_stt_capture.wav", e)
+            }
+
+            tSttStartNano = System.nanoTime()
+            Log.i(TAG, "[PTT-DIAG] STT transcription started (${samples.size} samples, RMS=${String.format(java.util.Locale.US, "%.4f", metrics.rms)})")
             val t0 = System.currentTimeMillis()
             _state.value = _state.value.copy(sttStatus = SttStatus.TRANSCRIBING)
             
             val result = sttManager?.transcribe(samples)
+            tSttEndNano = System.nanoTime()
             val elapsed = System.currentTimeMillis() - t0
+
+            val pttToAudioStartMs = if (tPttPressNano > 0 && tAudioRecordStartNano > 0) (tAudioRecordStartNano - tPttPressNano) / 1_000_000.0 else 0.0
+            val vadSpeechDurationMs = if (tVadSpeechStartNano > 0 && tVadSpeechEndNano > 0) (tVadSpeechEndNano - tVadSpeechStartNano) / 1_000_000.0 else 0.0
+            val pttHoldMs = if (tPttPressNano > 0 && tPttReleaseNano > 0) (tPttReleaseNano - tPttPressNano) / 1_000_000.0 else 0.0
+            val sttDurationMs = if (tSttStartNano > 0 && tSttEndNano > 0) (tSttEndNano - tSttStartNano) / 1_000_000.0 else 0.0
+
+            Log.i(TAG, "[PTT-LATENCY] pttPress_to_audioStart_ms=${String.format(java.util.Locale.US, "%.1f", pttToAudioStartMs)} vadSpeechDuration_ms=${String.format(java.util.Locale.US, "%.1f", vadSpeechDurationMs)} pttHold_ms=${String.format(java.util.Locale.US, "%.1f", pttHoldMs)} sttDuration_ms=${String.format(java.util.Locale.US, "%.1f", sttDurationMs)}")
             
             if (result != null) {
                 Log.i(TAG, "[PTT-DIAG] STT transcription ended in ${elapsed}ms: '${result.text.take(30)}...'")

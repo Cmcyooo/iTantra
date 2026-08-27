@@ -92,6 +92,13 @@ class SherpaOnnxSttEngine(
                 rec.decode(stream)
                 val rawText = rec.getResult(stream).text.trim()
                 resultText = IndicDomainNormalizer.normalize(rawText, language.code)
+                Log.i(TAG, "[WHISPER-DECODE] raw='$rawText' normalized='$resultText'")
+                
+                // Diagnostic logging for specific test phrases per Phase 12A
+                if (rawText.contains("test", ignoreCase = true) || rawText.contains("radio", ignoreCase = true) || rawText.contains("alpha", ignoreCase = true)) {
+                    Log.i(TAG, "HYPOTHESIS: $rawText")
+                }
+                
                 stream.release()
             }
 

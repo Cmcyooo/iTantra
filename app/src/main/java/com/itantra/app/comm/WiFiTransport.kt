@@ -40,47 +40,81 @@ class WiFiTransport : Transport {
     }
 
     override fun connect(targetId: String?) {
-        if (_connectionState.value != ConnectionState.DISCONNECTED) return
+        val isHosting = targetId.isNullOrBlank()
         
-        _connectionState.value = ConnectionState.CONNECTING
+        if (!isHosting) {
+            // Client mode: Only allow if disconnected or failed
+            if (_connectionState.value == ConnectionState.CONNECTED || _connectionState.value == ConnectionState.CONNECTING) {
+                Log.w(TAG, "Ignoring connect request: already in state ${_connectionState.value}")
+                return
+            }
+            _connectionState.value = ConnectionState.CONNECTING
+        } else {
+            // Host mode: Don't set CONNECTING state so the UI remains responsive for outbound connects.
+            // We just ensure we are not already connected.
+            if (_connectionState.value == ConnectionState.CONNECTED) return
+        }
+        
         _lastError.value = null
 
         transportScope.launch {
             try {
-                if (targetId.isNullOrBlank()) {
+                if (isHosting) {
                     // Host mode: Start ServerSocket
                     startServer()
                 } else {
-                    // Client mode: Connect to IP
-                    startClient(targetId)
+                    // Client mode: Connect to IP with 10s timeout per Phase 12A
+                    withTimeout(10000L) {
+                        startClient(targetId)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Connection failed", e)
-                _lastError.value = e.message
-                _connectionState.value = ConnectionState.ERROR
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "Connection timed out after 10s")
+                _lastError.value = "Connection timed out"
+                if (!isHosting) {
+                    _connectionState.value = ConnectionState.ERROR
+                }
                 cleanup()
+            } catch (e: Exception) {
+                if (isActive) {
+                    Log.e(TAG, "Connection failed", e)
+                    _lastError.value = e.message
+                    if (!isHosting) {
+                        _connectionState.value = ConnectionState.ERROR
+                    } else {
+                        // If hosting fails (e.g. BindException), ensure we are DISCONNECTED
+                        _connectionState.value = ConnectionState.DISCONNECTED
+                    }
+                    cleanup()
+                }
             }
         }
     }
 
     private suspend fun startServer() = withContext(Dispatchers.IO) {
-        serverSocket = ServerSocket(PORT).apply {
-            reuseAddress = true
-        }
-        Log.d(TAG, "Server started on port $PORT, waiting for connection...")
-        
-        val socket = serverSocket?.accept()
-        if (socket != null) {
-            socket.tcpNoDelay = true
-            setupConnection(socket)
+        try {
+            serverSocket = ServerSocket(PORT).apply {
+                reuseAddress = true
+            }
+            Log.d(TAG, "Server started on port $PORT, waiting for connection...")
+            
+            val socket = serverSocket?.accept()
+            if (socket != null) {
+                socket.tcpNoDelay = true
+                setupConnection(socket)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start server on port $PORT", e)
+            throw e
         }
     }
 
     private suspend fun startClient(ip: String) = withContext(Dispatchers.IO) {
         Log.d(TAG, "Connecting to $ip:$PORT...")
-        val socket = Socket(ip, PORT).apply {
-            tcpNoDelay = true // Disable Nagle's algorithm for lower latency
-        }
+        val socket = Socket()
+        // Use a connect timeout on the socket itself in addition to withTimeout
+        socket.connect(java.net.InetSocketAddress(ip, PORT), 10000)
+        socket.tcpNoDelay = true
         setupConnection(socket)
     }
 

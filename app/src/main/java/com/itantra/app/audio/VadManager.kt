@@ -47,11 +47,12 @@ class VadManager(context: Context) {
             Log.i(TAG, "Model copied to: ${modelFile.absolutePath}, size: ${modelFile.length()} bytes")
 
             // Configure Silero VAD with optimized speech onset and natural pause tolerance
+            // Parameter order: (model, threshold, minSilenceDuration, minSpeechDuration, windowSize)
             val sileroConfig = SileroVadModelConfig(
                 modelFile.absolutePath,
-                0.5f,   // threshold
-                0.15f,  // minSpeechDuration: 150ms ensures rapid onset capture without clipping first syllable
+                0.4f,   // threshold
                 0.7f,   // minSilenceDuration: 700ms prevents premature utterance cutoff during natural pauses
+                0.15f,  // minSpeechDuration: 150ms ensures rapid onset capture without clipping first syllable
                 windowSize
             )
             
@@ -82,18 +83,39 @@ class VadManager(context: Context) {
     }
 
     /**
-     * Processes a chunk of normalized Float PCM samples.
-     * Returns the updated VadStatus.
+     * Complete decision result of VAD processing on an audio chunk.
      */
-    fun process(floatData: FloatArray): VadStatus {
-        val vad = vad ?: return VadStatus.SILENCE
+    data class VadDecision(
+        val probability: Float,
+        val nativeSpeechDetected: Boolean,
+        val status: VadStatus
+    )
+
+    /**
+     * Backward-compatible result alias for VadDecision.
+     */
+    typealias VadProcessResult = VadDecision
+
+    /**
+     * Processes a chunk of normalized Float PCM samples.
+     * Returns the complete VadDecision containing speech probability, native detection flag, and status.
+     */
+    fun processDecision(floatData: FloatArray): VadDecision {
+        val vad = vad ?: return VadDecision(0.0f, false, VadStatus.SILENCE)
         
-        // Push audio to detector
+        // 1. Compute speech probability on chunk if chunk size matches windowSize
+        val prob = try {
+            if (floatData.size == windowSize) vad.compute(floatData) else -1.0f
+        } catch (e: Exception) {
+            -1.0f
+        }
+
+        // 2. Push audio to detector
         vad.acceptWaveform(floatData)
 
         val isSpeech = vad.isSpeechDetected()
         
-        // Check for state changes
+        // 3. Update internal state transitions
         val wasSpeaking = currentStatus == VadStatus.SPEAKING || currentStatus == VadStatus.SPEECH_DETECTED
         
         if (isSpeech) {
@@ -112,14 +134,38 @@ class VadManager(context: Context) {
             }
         }
 
-        return currentStatus
+        return VadDecision(
+            probability = prob,
+            nativeSpeechDetected = isSpeech,
+            status = currentStatus
+        )
+    }
+
+    /**
+     * Processes a chunk and returns VadDecision (backward compatibility).
+     */
+    fun processWithProbability(floatData: FloatArray): VadDecision {
+        return processDecision(floatData)
+    }
+
+    /**
+     * Backward-compatible process method returning only VadStatus.
+     */
+    fun process(floatData: FloatArray): VadStatus {
+        return processDecision(floatData).status
     }
 
     /**
      * Resets the VAD detector state.
      */
     fun reset() {
-        // Recreate or reset if supported
+        try {
+            vad?.clear()
+            vad?.reset()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error resetting VAD", e)
+        }
+        currentStatus = VadStatus.SILENCE
     }
 
     /**
