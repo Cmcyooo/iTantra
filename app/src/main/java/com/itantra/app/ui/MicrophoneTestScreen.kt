@@ -39,11 +39,9 @@ import com.itantra.app.audio.*
 import com.itantra.app.comm.*
 import kotlinx.coroutines.launch
 
-enum class TransportMode {
-    WIFI,
-    WIFI_DIRECT,
-    BLUETOOTH
-}
+typealias TransportMode = com.itantra.app.comm.TransportMode
+
+
 
 @Composable
 fun MicrophoneTestScreen(
@@ -327,6 +325,7 @@ fun MicrophoneTestScreen(
                     TransportSelector(
                         currentMode = transportMode,
                         onModeChange = { mode ->
+                            connectingDeviceName = null
                             when (mode) {
                                 TransportMode.BLUETOOTH -> {
                                     if (!hasBluetoothPermission) {
@@ -1307,7 +1306,7 @@ fun DiscoverySection(
             }
         }
         
-        if (commState != ConnectionState.DISCONNECTED) {
+        if (commState == ConnectionState.CONNECTED) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onDisconnect,
@@ -1356,9 +1355,10 @@ fun DeviceItem(
                 )
             }
             
+            val canConnect = (commState == ConnectionState.DISCONNECTED || commState == ConnectionState.ERROR)
             Button(
                 onClick = onConnect,
-                enabled = commState == ConnectionState.DISCONNECTED || (commState == ConnectionState.ERROR && isConnectingToThis),
+                enabled = canConnect,
                 colors = when {
                     isConnectingToThis && commState == ConnectionState.CONNECTED -> 
                         ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))

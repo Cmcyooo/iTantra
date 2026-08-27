@@ -108,7 +108,11 @@ enum class SupportedLanguage(
 
     companion object {
         fun fromCode(code: String): SupportedLanguage {
-            return entries.find { it.code.equals(code, ignoreCase = true) } ?: ENGLISH
+            return fromCodeOrNull(code) ?: ENGLISH
+        }
+
+        fun fromCodeOrNull(code: String): SupportedLanguage? {
+            return entries.find { it.code.equals(code.trim(), ignoreCase = true) }
         }
     }
 }

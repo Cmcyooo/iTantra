@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.UUID
 
 /**
@@ -15,6 +17,9 @@ import java.util.UUID
 class CommunicationManager(initialTransport: Transport) {
     private var _transport = initialTransport
     
+    private val _selectedTransport = MutableStateFlow(TransportMode.WIFI)
+    val selectedTransport: StateFlow<TransportMode> = _selectedTransport.asStateFlow()
+
     private val _messages = MutableStateFlow<List<P2PMessage>>(emptyList())
     val messages: StateFlow<List<P2PMessage>> = _messages.asStateFlow()
 
@@ -30,7 +35,7 @@ class CommunicationManager(initialTransport: Transport) {
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
-    private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val managerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var externalListener: ((P2PMessage) -> Unit)? = null
     
     private var transportJob: Job? = null
@@ -43,20 +48,42 @@ class CommunicationManager(initialTransport: Transport) {
         observeTransport(_transport)
     }
 
-    fun setTransport(newTransport: Transport) {
-        if (_transport == newTransport) return
+    /**
+     * Explicitly switches the active transport mode and implementation.
+     * Decouples transport selection from connection state, always resetting
+     * connection state to DISCONNECTED so outbound CONNECT is immediately enabled.
+     */
+    fun selectTransport(mode: TransportMode, newTransport: Transport) {
+        val prevTransport = _selectedTransport.value
+        val prevConn = _connectionState.value
+        Log.i(TAG, "[WIFI-STATE] selectedTransport=$mode previousTransport=$prevTransport connectionState=DISCONNECTED previousConnectionState=$prevConn reason=TRANSPORT_SELECTED")
         
-        _transport.disconnect()
+        _selectedTransport.value = mode
+        
+        // Safely disconnect previous transport
+        try {
+            _transport.disconnect()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error disconnecting old transport", e)
+        }
         transportJob?.cancel()
         
         _transport = newTransport
-        // Immediately sync state with the new transport to avoid UI flicker or stale states
-        _connectionState.value = newTransport.connectionState.value
-        _lastError.value = newTransport.lastError.value
+        _connectionState.value = ConnectionState.DISCONNECTED
+        _lastError.value = null
         
         observeTransport(_transport)
-        
-        Log.i(TAG, "Switched transport to: ${newTransport::class.java.simpleName}")
+        Log.i(TAG, "Selected transport: $mode (${newTransport::class.java.simpleName})")
+    }
+
+    fun setTransport(newTransport: Transport) {
+        val guessedMode = when (newTransport::class.java.simpleName) {
+            "WiFiTransport" -> TransportMode.WIFI
+            "WiFiDirectTransport" -> TransportMode.WIFI_DIRECT
+            "BluetoothTransport" -> TransportMode.BLUETOOTH
+            else -> _selectedTransport.value
+        }
+        selectTransport(guessedMode, newTransport)
     }
 
     private fun observeTransport(transport: Transport) {
@@ -64,7 +91,11 @@ class CommunicationManager(initialTransport: Transport) {
         transportJob = managerScope.launch {
             launch {
                 transport.connectionState.collect { state ->
+                    val prev = _connectionState.value
                     _connectionState.value = state
+                    if (prev != state) {
+                        Log.i(TAG, "[WIFI-STATE] selectedTransport=${_selectedTransport.value} connectionState=$state previousState=$prev newState=$state reason=TRANSPORT_STATE_CHANGED")
+                    }
                 }
             }
             launch {
@@ -79,36 +110,66 @@ class CommunicationManager(initialTransport: Transport) {
     }
 
     fun connect(targetAddress: String? = null) {
+        val isClientConnect = !targetAddress.isNullOrBlank()
+        if (isClientConnect) {
+            val prev = _connectionState.value
+            _connectionState.value = ConnectionState.CONNECTING
+            Log.i(TAG, "[WIFI-STATE] selectedTransport=${_selectedTransport.value} connectionState=CONNECTING previousState=$prev newState=CONNECTING reason=CONNECT_REQUESTED")
+        } else {
+            Log.i(TAG, "[WIFI-STATE] selectedTransport=${_selectedTransport.value} connectionState=${_connectionState.value} reason=PASSIVE_HOST_REQUESTED")
+        }
         _transport.connect(targetAddress)
     }
 
     fun disconnect() {
-        _transport.disconnect()
+        val prev = _connectionState.value
+        try {
+            _transport.disconnect()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error during transport disconnect", e)
+        }
+        _connectionState.value = ConnectionState.DISCONNECTED
+        Log.i(TAG, "[WIFI-STATE] selectedTransport=${_selectedTransport.value} connectionState=DISCONNECTED previousState=$prev newState=DISCONNECTED reason=USER_DISCONNECTED")
     }
 
     private val pendingAcks = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     fun getConnectedPeerId(): String? = _transport.getConnectedPeerId()
 
-    fun sendText(text: String, language: String = "en", senderName: String? = null): P2PMessage {
+    fun sendText(
+        text: String,
+        language: String = "en",
+        senderName: String? = null,
+        utteranceId: String = UUID.randomUUID().toString()
+    ): P2PMessage {
         val sendStartTime = android.os.SystemClock.elapsedRealtime()
+        val msgId = UUID.randomUUID().toString()
         val message = P2PMessage(
-            messageId = UUID.randomUUID().toString(),
+            messageId = msgId,
             timestamp = System.currentTimeMillis(),
             language = language,
             text = text,
             senderName = senderName,
             messageType = P2PMessage.MESSAGE_TYPE_NORMAL,
-            priority = P2PMessage.PRIORITY_NORMAL
+            priority = P2PMessage.PRIORITY_NORMAL,
+            utteranceId = utteranceId
         )
         if (text.isNotEmpty()) {
             pendingAcks[message.messageId] = sendStartTime
         }
+        val payloadBytes = try {
+            Json.encodeToString(message).toByteArray(Charsets.UTF_8).size
+        } catch (e: Exception) {
+            text.toByteArray(Charsets.UTF_8).size
+        }
+        Log.i(TAG, "[TX-MESSAGE] utteranceId=$utteranceId messageId=$msgId language=$language payloadBytes=$payloadBytes")
+
         try {
             _transport.sendMessage(message)
         } catch (e: Exception) {
-            Log.e(TAG, "Transport send failed", e)
+            Log.e(TAG, "Transport send failed for utteranceId=$utteranceId", e)
             _lastError.value = "Send failed: ${e.message}"
+            throw e
         }
         
         // Add local message to list for UI
@@ -119,23 +180,38 @@ class CommunicationManager(initialTransport: Transport) {
     /**
      * Sends a HIGH-priority Emergency Alert message.
      */
-    fun sendAlert(text: String, language: String = "en", senderName: String? = null): P2PMessage {
+    fun sendAlert(
+        text: String,
+        language: String = "en",
+        senderName: String? = null,
+        utteranceId: String = UUID.randomUUID().toString()
+    ): P2PMessage {
         val sendStartTime = android.os.SystemClock.elapsedRealtime()
+        val msgId = UUID.randomUUID().toString()
         val message = P2PMessage(
-            messageId = UUID.randomUUID().toString(),
+            messageId = msgId,
             timestamp = System.currentTimeMillis(),
             language = language,
             text = text,
             senderName = senderName,
             messageType = P2PMessage.MESSAGE_TYPE_ALERT,
-            priority = P2PMessage.PRIORITY_HIGH
+            priority = P2PMessage.PRIORITY_HIGH,
+            utteranceId = utteranceId
         )
         pendingAcks[message.messageId] = sendStartTime
+        val payloadBytes = try {
+            Json.encodeToString(message).toByteArray(Charsets.UTF_8).size
+        } catch (e: Exception) {
+            text.toByteArray(Charsets.UTF_8).size
+        }
+        Log.i(TAG, "[TX-MESSAGE] utteranceId=$utteranceId messageId=$msgId language=$language payloadBytes=$payloadBytes (ALERT)")
+
         try {
             _transport.sendMessage(message)
         } catch (e: Exception) {
-            Log.e(TAG, "Transport sendAlert failed", e)
+            Log.e(TAG, "Transport sendAlert failed for utteranceId=$utteranceId", e)
             _lastError.value = "Alert send failed: ${e.message}"
+            throw e
         }
         addMessageToList(message)
         return message
@@ -183,6 +259,13 @@ class CommunicationManager(initialTransport: Transport) {
                 onAckReceivedListener?.invoke(message.text)
                 return@launch
             }
+
+            val payloadBytes = try {
+                Json.encodeToString(message).toByteArray(Charsets.UTF_8).size
+            } catch (e: Exception) {
+                message.text.toByteArray(Charsets.UTF_8).size
+            }
+            Log.i(TAG, "[RX-MESSAGE] utteranceId=${message.utteranceId} messageId=${message.messageId} language=${message.language} payloadBytes=$payloadBytes")
 
             // Immediately send ACK for received message so sender can measure RTT
             if (message.text.isNotEmpty()) {

@@ -25,7 +25,8 @@ data class AudioState(
     val sttStatus: SttStatus = SttStatus.IDLE,
     val recognizedText: String = "",
     val lastSttResult: SttResult? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val utteranceId: String? = null
 )
 
 /**
@@ -49,6 +50,7 @@ class AudioCaptureManager(private val context: Context) {
     
     private var vadManager: VadManager? = null
     private var sttManager: SttManager? = null
+    private var currentUtteranceId: String? = null
 
     val languageModelManager: LanguageModelManager
         get() = LanguageModelManager.getInstance(context)
@@ -93,6 +95,9 @@ class AudioCaptureManager(private val context: Context) {
     private var consecutiveElevatedCount = 0
     private var consecutiveSilenceCount = 0
 
+    var lastFinalizedSpeech: FloatArray? = null
+        private set
+
     // Monotonic timing for latency diagnostics (Phase 12A)
     var tPttPressNano: Long = 0L
     var tAudioRecordStartNano: Long = 0L
@@ -130,6 +135,7 @@ class AudioCaptureManager(private val context: Context) {
     fun startRecording() {
         if (_state.value.isRecording) return
         
+        currentUtteranceId = java.util.UUID.randomUUID().toString()
         tPttPressNano = System.nanoTime()
         tVadSpeechStartNano = 0L
         tVadSpeechEndNano = 0L
@@ -206,7 +212,8 @@ class AudioCaptureManager(private val context: Context) {
                 sampleCount = 0,
                 durationSeconds = 0.0,
                 rms = 0.0,
-                errorMessage = null
+                errorMessage = null,
+                utteranceId = currentUtteranceId
             )
 
             recordingJob = scope.launch {
@@ -490,12 +497,14 @@ class AudioCaptureManager(private val context: Context) {
                     Log.i(TAG, "[PTT-DIAG] Speech endpoint reached (silence detected). Finalizing utterance (${speechSamplesCount} samples).")
                     captureState = CaptureState.ENDING
                     val speechData = flattenAccumulator()
+                    lastFinalizedSpeech = speechData
                     speechAccumulator.clear()
                     speechSamplesCount = 0
                     rollingHistory.clear()
                     consecutiveElevatedCount = 0
                     consecutiveSilenceCount = 0
                     lastAppendedSequence = -1L
+                    vadManager?.reset()
 
                     runStt(speechData)
                     captureState = CaptureState.LISTENING
@@ -542,7 +551,16 @@ class AudioCaptureManager(private val context: Context) {
     /**
      * Diagnostic helper: returns the currently accumulated speech buffer.
      */
-    fun getAccumulatedSpeech(): FloatArray = flattenAccumulator()
+    fun getAccumulatedSpeech(): FloatArray {
+        val finalized = lastFinalizedSpeech
+        if (finalized != null && finalized.size >= speechSamplesCount) {
+            return finalized
+        }
+        if (speechAccumulator.isNotEmpty()) {
+            return flattenAccumulator()
+        }
+        return finalized ?: FloatArray(0)
+    }
 
     /**
      * Diagnostic helper: resets capture state machine and clears all history buffers.
@@ -556,6 +574,7 @@ class AudioCaptureManager(private val context: Context) {
         lastAppendedSequence = -1L
         chunkSequence = 0L
         captureState = CaptureState.LISTENING
+        lastFinalizedSpeech = null
         vadManager?.reset()
     }
 
@@ -688,15 +707,19 @@ class AudioCaptureManager(private val context: Context) {
             Log.i(TAG, "[PTT-LATENCY] pttPress_to_audioStart_ms=${String.format(java.util.Locale.US, "%.1f", pttToAudioStartMs)} vadSpeechDuration_ms=${String.format(java.util.Locale.US, "%.1f", vadSpeechDurationMs)} pttHold_ms=${String.format(java.util.Locale.US, "%.1f", pttHoldMs)} sttDuration_ms=${String.format(java.util.Locale.US, "%.1f", sttDurationMs)}")
             
             if (result != null) {
-                Log.i(TAG, "[PTT-DIAG] STT transcription ended in ${elapsed}ms: '${result.text.take(30)}...'")
+                Log.i(TAG, "[PTT-DIAG] STT transcription ended in ${elapsed}ms: '${result.text.take(30)}...' (utteranceId=$currentUtteranceId)")
                 _state.value = _state.value.copy(
+                    utteranceId = currentUtteranceId,
                     sttStatus = SttStatus.COMPLETE,
                     recognizedText = result.text,
                     lastSttResult = result
                 )
             } else {
-                Log.w(TAG, "[PTT-DIAG] STT transcription returned null in ${elapsed}ms")
-                _state.value = _state.value.copy(sttStatus = SttStatus.ERROR)
+                Log.w(TAG, "[PTT-DIAG] STT transcription returned null in ${elapsed}ms (utteranceId=$currentUtteranceId)")
+                _state.value = _state.value.copy(
+                    utteranceId = currentUtteranceId,
+                    sttStatus = SttStatus.ERROR
+                )
             }
         }
     }

@@ -125,8 +125,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleTransportModeChange(mode: TransportMode) {
-        commManager.disconnect()
-        
         // Stop all discovery/advertising
         wifiDiscoveryManager.stopAdvertising()
         wifiDiscoveryManager.stopDiscovery()
@@ -135,20 +133,20 @@ class MainActivity : ComponentActivity() {
 
         when (mode) {
             TransportMode.WIFI -> {
-                commManager.setTransport(wifiTransport)
+                commManager.selectTransport(TransportMode.WIFI, wifiTransport)
                 wifiDiscoveryManager.startAdvertising()
                 wifiDiscoveryManager.startDiscovery()
                 // Auto-start as Host for Wi-Fi
                 commManager.connect(null)
             }
             TransportMode.WIFI_DIRECT -> {
-                commManager.setTransport(wifiDirectTransport)
+                commManager.selectTransport(TransportMode.WIFI_DIRECT, wifiDirectTransport)
                 wifiDirectManager.startDiscovery()
                 // For WiFi Direct, connect(null) means start discovery/advertising
                 commManager.connect(null)
             }
             TransportMode.BLUETOOTH -> {
-                commManager.setTransport(bluetoothTransport)
+                commManager.selectTransport(TransportMode.BLUETOOTH, bluetoothTransport)
                 bluetoothDiscoveryManager.startDiscovery()
                 // Auto-start as Host for Bluetooth (listening)
                 commManager.connect(null)

@@ -319,4 +319,32 @@
 * **Non-Disruptive Normal Mode**:
     * Normal walkie-talkie mode remains 100% functional with zero regressions when emergency mode is inactive.
 
+## Phase 12A/12B: VAD Onset Timing Recovery
+* **Onset Recovery Strategy**:
+    * Retain native Silero VAD v4 without changing the probability threshold.
+    * Added a 1500 ms rolling ring buffer that preserves pre-speech audio frames. When native VAD triggers `SPEECH_DETECTED`, the preceding audio is stitched seamlessly, completely eliminating the first-word cutoff problem (13/13 test cases validated on physical Redmi Note 9 Pro).
+
+## Phase 12C: Decoupled Wi-Fi Connection State Architecture
+* **State Decoupling**:
+    * `TransportMode` (Wi-Fi, Wi-Fi Direct, Bluetooth) is tracked independently from `ConnectionState`.
+    * Selecting a transport unconditionally resets connection state to `DISCONNECTED`, clearing stale errors and enabling the CONNECT button.
+    * Outbound client connects implement a 10s bounded timeout that auto-recovers to `DISCONNECTED` on failure.
+    * Passive server hosting operates without disabling the outbound CONNECT button.
+    * Fixed `ServerSocket` bind sequence to set `SO_REUSEADDR` before `bind()`.
+
+## Phase 13: End-to-End Two-Phone Communication Loop Architecture
+* **One Utterance = One Message (`utteranceId`)**:
+    * Implemented single immutable `utteranceId` generated at PTT press and preserved through VAD, STT, serialized `P2PMessage`, network delivery, and TTS synthesis.
+    * Eliminated text-equality deduplication in `TransceiverManager` (`state.recognizedText != lastSentText`), enabling intentional repetition of identical phrases (e.g. *"Radio check"*, *"Radio check"*).
+* **Strict Receiver Language Propagation**:
+    * The receiver resolves language strictly from `message.language`, overriding the receiver's local UI state.
+    * Unsupported language codes fail cleanly with structured error logs without synthesizing with an incorrect voice.
+* **Universal Duplicate Suppression**:
+    * Extended deduplication across all message types (both `NORMAL` and `ALERT`) using `messageId` and `utteranceId`, preventing duplicate speech output upon network retransmissions.
+* **Single-Active Warm Model Caching**:
+    * Existing initialized TTS engines are reused across messages in the same language, dropping synthesis latency to **170–179 ms** on mobile CPUs without native memory creep.
+* **Extreme Low-Bandwidth Protocol**:
+    * Transmitting speech as text packets (197 bytes) delivers **99.75% bandwidth reduction** compared to raw uncompressed PCM audio (80,000 bytes for a 2.5s utterance).
+
+
 

@@ -41,8 +41,8 @@ class AlertPlaybackManager(
     private val alertQueue = ConcurrentLinkedQueue<P2PMessage>()
     private val normalQueue = ConcurrentLinkedQueue<P2PMessage>()
 
-    // Deduplication cache for played alerts
-    private val playedAlertIds = Collections.synchronizedSet(LinkedHashSet<String>())
+    // Deduplication cache for played messages (both alerts and normal messages)
+    private val playedMessageIds = Collections.synchronizedSet(LinkedHashSet<String>())
 
     // State flows
     private val _activeAlert = MutableStateFlow<P2PMessage?>(null)
@@ -64,38 +64,40 @@ class AlertPlaybackManager(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     /**
-     * Checks if an alert was already played or queued (deduplication check).
+     * Checks if a message was already played or queued (deduplication check).
      */
     fun isAlertDuplicate(messageId: String): Boolean {
-        synchronized(playedAlertIds) {
-            return playedAlertIds.contains(messageId)
+        synchronized(playedMessageIds) {
+            return playedMessageIds.contains(messageId)
         }
     }
 
     /**
      * Enqueues an incoming P2P message for audio playback according to priority.
+     * Enforces universal deduplication for both normal messages and alerts.
      */
     fun enqueueMessage(message: P2PMessage) {
         if (message.text.isBlank()) return
 
-        if (message.isAlert) {
-            // Step 1: Deduplication
-            synchronized(playedAlertIds) {
-                if (playedAlertIds.contains(message.messageId)) {
-                    Log.i(TAG, "Duplicate alert packet ignored: ${message.messageId}")
-                    return
-                }
-                playedAlertIds.add(message.messageId)
-                if (playedAlertIds.size > MAX_DEDUP_CACHE_SIZE) {
-                    val it = playedAlertIds.iterator()
-                    if (it.hasNext()) {
-                        it.next()
-                        it.remove()
-                    }
+        // Universal Deduplication across all incoming messages
+        synchronized(playedMessageIds) {
+            if (playedMessageIds.contains(message.messageId) || playedMessageIds.contains(message.utteranceId)) {
+                Log.i(TAG, "Duplicate message ignored: messageId=${message.messageId} utteranceId=${message.utteranceId}")
+                return
+            }
+            playedMessageIds.add(message.messageId)
+            playedMessageIds.add(message.utteranceId)
+            while (playedMessageIds.size > MAX_DEDUP_CACHE_SIZE) {
+                val it = playedMessageIds.iterator()
+                if (it.hasNext()) {
+                    it.next()
+                    it.remove()
                 }
             }
+        }
 
-            Log.i(TAG, "Queuing HIGH PRIORITY alert: '${message.text}' (id: ${message.messageId})")
+        if (message.isAlert) {
+            Log.i(TAG, "Queuing HIGH PRIORITY alert: '${message.text}' (id: ${message.messageId}, utteranceId: ${message.utteranceId})")
 
             // Preempt normal playback if currently active
             if (_isNormalPlaying.value) {
@@ -108,7 +110,7 @@ class AlertPlaybackManager(
             processNext()
         } else {
             // Normal priority message
-            Log.d(TAG, "Queuing normal message: '${message.text}'")
+            Log.d(TAG, "Queuing normal message: '${message.text}' (id: ${message.messageId}, utteranceId: ${message.utteranceId})")
             normalQueue.add(message)
             processNext()
         }
@@ -157,30 +159,43 @@ class AlertPlaybackManager(
                 _focusError.value = null
             }
 
-            // Synthesize using active or target language TTS
+            // Language Resolution
+            val targetLang = SupportedLanguage.fromCodeOrNull(alert.language) ?: SupportedLanguage.ENGLISH
+            val currentVoiceConfig = TtsVoiceConfig.getConfigFor(targetLang)
+            Log.i(
+                TAG,
+                "[RX-LANGUAGE] utteranceId=${alert.utteranceId} messageLanguage=${alert.language} " +
+                "selectedTtsLanguage=${targetLang.code} selectedTtsEngine=${currentVoiceConfig.type} selectedVoice=${currentVoiceConfig.voiceTag} (ALERT)"
+            )
+
+            // Synthesize using target language TTS
             val ttsStartTime = android.os.SystemClock.elapsedRealtime()
-            val generatedAudio = ttsManager.generateSpeech(alert.text, alert.language)
+            val generatedAudio = ttsManager.generateSpeech(alert.text, targetLang.code)
             val ttsEndTime = android.os.SystemClock.elapsedRealtime()
             val ttsDurationMs = ttsEndTime - ttsStartTime
 
             if (generatedAudio == null || generatedAudio.samples.isEmpty()) {
-                Log.e(TAG, "Failed to synthesize speech for alert utteranceId=${alert.utteranceId}")
+                Log.e(TAG, "[RX-TTS] utteranceId=${alert.utteranceId} TTS FAILED (ALERT)")
                 finishAlert(alert, alertStartTime)
                 return@launch
             }
 
+            Log.i(
+                TAG,
+                "[RX-TTS] utteranceId=${alert.utteranceId} language=${targetLang.code} " +
+                "engine=${currentVoiceConfig.type} voice=${currentVoiceConfig.voiceTag} latency=${ttsDurationMs}ms (ALERT)"
+            )
+
             val playbackStartTime = android.os.SystemClock.elapsedRealtime()
             val audioStartDelayMs = playbackStartTime - ttsEndTime
-
-            val currentLang = ttsManager.languageTtsManager.currentLanguage.value
-            val currentVoiceConfig = TtsVoiceConfig.getConfigFor(currentLang)
+            Log.i(TAG, "[PLAYBACK] utteranceId=${alert.utteranceId} audioStart=${audioStartDelayMs}ms (ALERT)")
 
             Log.i(
                 TAG,
                 "[TELEMETRY-RECEIVER] utteranceId=${alert.utteranceId} language=${alert.language} " +
                 "TTS_language=${currentVoiceConfig.language.code} TTS_engine=${currentVoiceConfig.type} " +
                 "TTS_model=${currentVoiceConfig.modelDirName} TTS_START->TTS_END=${ttsDurationMs}ms " +
-                "TTS_END->AUDIO_PLAYBACK_START=${audioStartDelayMs}ms"
+                "TTS_END->AUDIO_PLAYBACK_START=${audioStartDelayMs}ms (ALERT)"
             )
 
             // Play via AudioTrack with USAGE_ALARM / SPEECH
@@ -220,26 +235,68 @@ class AlertPlaybackManager(
             _isNormalPlaying.value = true
             Log.d(TAG, "Playing normal message: utteranceId=${message.utteranceId} [lang=${message.language}]")
 
+            // 1. Language Resolution and Validation
+            val targetLang = SupportedLanguage.fromCodeOrNull(message.language)
+            if (targetLang == null) {
+                Log.e(TAG, "[RX-LANGUAGE] utteranceId=${message.utteranceId} messageLanguage=${message.language} ERROR: Unsupported language!")
+                _isNormalPlaying.value = false
+                processNext()
+                return@launch
+            }
+
+            val voiceConfig = TtsVoiceConfig.getConfigFor(targetLang)
+            Log.i(
+                TAG,
+                "[RX-LANGUAGE] utteranceId=${message.utteranceId} messageLanguage=${message.language} " +
+                "selectedTtsLanguage=${targetLang.code} selectedTtsEngine=${voiceConfig.type} selectedVoice=${voiceConfig.voiceTag}"
+            )
+
+            // 2. TTS Synthesis with Timing Instrumentation
             val ttsStartTime = android.os.SystemClock.elapsedRealtime()
-            ttsManager.speak(message.text, message.language) {
-                val playbackStartTime = android.os.SystemClock.elapsedRealtime()
-                val currentLang = ttsManager.languageTtsManager.currentLanguage.value
-                val currentVoiceConfig = TtsVoiceConfig.getConfigFor(currentLang)
-                val ttsDurationMs = ttsManager.lastResult.value?.synthesisTimeMs ?: (playbackStartTime - ttsStartTime)
+            val generatedAudio = ttsManager.generateSpeech(message.text, targetLang.code)
+            val ttsEndTime = android.os.SystemClock.elapsedRealtime()
+            val ttsDurationMs = ttsEndTime - ttsStartTime
 
-                Log.i(
-                    TAG,
-                    "[TELEMETRY-RECEIVER] utteranceId=${message.utteranceId} language=${message.language} " +
-                    "TTS_language=${currentVoiceConfig.language.code} TTS_engine=${currentVoiceConfig.type} " +
-                    "TTS_model=${currentVoiceConfig.modelDirName} TTS_START->TTS_END=${ttsDurationMs}ms"
-                )
+            if (generatedAudio == null || generatedAudio.samples.isEmpty()) {
+                Log.e(TAG, "[RX-TTS] utteranceId=${message.utteranceId} TTS FAILED")
+                _isNormalPlaying.value = false
+                processNext()
+                return@launch
+            }
 
-                scope.launch {
+            Log.i(
+                TAG,
+                "[RX-TTS] utteranceId=${message.utteranceId} language=${targetLang.code} " +
+                "engine=${voiceConfig.type} voice=${voiceConfig.voiceTag} latency=${ttsDurationMs}ms"
+            )
+
+            // 3. AudioTrack Playback Startup
+            val playbackStartTime = android.os.SystemClock.elapsedRealtime()
+            val audioStartDelayMs = playbackStartTime - ttsEndTime
+            Log.i(TAG, "[PLAYBACK] utteranceId=${message.utteranceId} audioStart=${audioStartDelayMs}ms")
+
+            Log.i(
+                TAG,
+                "[TELEMETRY-RECEIVER] utteranceId=${message.utteranceId} language=${message.language} " +
+                "TTS_language=${targetLang.code} TTS_engine=${voiceConfig.type} " +
+                "TTS_model=${voiceConfig.modelDirName} TTS_START->TTS_END=${ttsDurationMs}ms " +
+                "TTS_END->AUDIO_PLAYBACK_START=${audioStartDelayMs}ms"
+            )
+
+            val speechAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+
+            ttsManager.playAudioWithAttributes(
+                samples = generatedAudio.samples,
+                sampleRate = generatedAudio.sampleRate,
+                attributes = speechAttributes,
+                onComplete = {
                     _isNormalPlaying.value = false
-                    // Continue queue processing
                     processNext()
                 }
-            }
+            )
         }
     }
 
@@ -287,6 +344,7 @@ class AlertPlaybackManager(
     fun reset() {
         alertQueue.clear()
         normalQueue.clear()
+        playedMessageIds.clear()
         abandonAlertFocus()
         _activeAlert.value = null
         _isAlertPlaying.value = false

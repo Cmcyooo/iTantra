@@ -126,7 +126,11 @@ class LanguageTtsManager(private val context: Context) {
         if (text.isBlank()) return null
 
         if (!languageCode.isNullOrBlank()) {
-            val targetLang = SupportedLanguage.fromCode(languageCode)
+            val targetLang = SupportedLanguage.fromCodeOrNull(languageCode)
+            if (targetLang == null) {
+                Log.e(TAG, "generateSpeech: Unsupported language code: $languageCode")
+                return null
+            }
             if (_currentLanguage.value != targetLang || activeEngine == null || !activeEngine!!.isReady) {
                 setLanguage(targetLang)
             }
@@ -172,7 +176,12 @@ class LanguageTtsManager(private val context: Context) {
 
         scope.launch {
             if (!languageCode.isNullOrBlank()) {
-                val targetLang = SupportedLanguage.fromCode(languageCode)
+                val targetLang = SupportedLanguage.fromCodeOrNull(languageCode)
+                if (targetLang == null) {
+                    Log.e(TAG, "speak: Unsupported language code: $languageCode")
+                    onComplete?.invoke()
+                    return@launch
+                }
                 if (_currentLanguage.value != targetLang || activeEngine == null || !activeEngine!!.isReady) {
                     setLanguage(targetLang)
                 }

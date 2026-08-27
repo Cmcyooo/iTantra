@@ -13,6 +13,15 @@ enum class ConnectionState {
 }
 
 /**
+ * Transport mechanisms available in iTantra.
+ */
+enum class TransportMode {
+    WIFI,
+    WIFI_DIRECT,
+    BLUETOOTH
+}
+
+/**
  * Message delivery status indicator.
  */
 enum class DeliveryStatus {

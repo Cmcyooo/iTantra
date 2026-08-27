@@ -43,6 +43,25 @@
 * **TTS Time (Piper INT8, 2 threads)**: ~150-250ms (Optimized from ~246ms)
 * **Approx. Total (Endpoint to Audio)**: ~500-750ms (Target: < 1.0s for fluid interaction)
 
+## Phase 13 Physical Two-Phone Communication Benchmarks
+* **Tested On**: Xiaomi Redmi Note 9 Pro (`954bd222`, Qualcomm Snapdragon 720G)
+* **Test Suite**: `EndToEndSpeechCommunicationTest` (8/8 PASSED in 21.172s)
+
+### Low-Bandwidth & Payload Compression Metrics (Measured)
+* **Text Payload Bytes**: 29 bytes ("Hello, this is a radio check.")
+* **Serialized JSON Packet Bytes**: 197 bytes
+* **Uncompressed Audio Baseline (2.5s speech @ 16kHz PCM16)**: 80,000 bytes
+* **Measured Bandwidth Reduction**: **99.75%**
+
+### Multilingual TTS Synthesis Benchmark (Measured on Physical Snapdragon 720G)
+* **English (`en`)**: 32,508 samples, 2.03s audio, 2,335ms synthesis time, 1.15 RTF
+* **Hindi (`hi`)**: 38,912 samples, 1.76s audio, 2,763ms synthesis time, 1.57 RTF
+* **Telugu (`te`)**: 34,249 samples, 1.55s audio, 1,856ms synthesis time, 1.19 RTF
+* **Marathi (`mr`)**: 32,818 samples, 1.49s audio, 1,877ms synthesis time, 1.25 RTF
+* **Tamil (`ta`)**: 44,771 samples, 2.03s audio, 2,880ms synthesis time, 1.41 RTF
+* **Bengali (`bn`)**: 30,384 samples, 1.38s audio, 1,904ms synthesis time, 1.37 RTF
+* **Warm TTS Cache Reuse**: First call ~358ms, subsequent call **170–179ms**
+
 ## Battery Impact
 * **Energy Consumption per hour of active use**: TBD
 

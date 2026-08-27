@@ -43,16 +43,19 @@ class WiFiTransport : Transport {
         val isHosting = targetId.isNullOrBlank()
         
         if (!isHosting) {
-            // Client mode: Only allow if disconnected or failed
-            if (_connectionState.value == ConnectionState.CONNECTED || _connectionState.value == ConnectionState.CONNECTING) {
+            // Client mode: Only allow if disconnected or error
+            if (_connectionState.value == ConnectionState.CONNECTING) {
                 Log.w(TAG, "Ignoring connect request: already in state ${_connectionState.value}")
                 return
             }
+            val prev = _connectionState.value
             _connectionState.value = ConnectionState.CONNECTING
+            Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=CONNECTING previousState=$prev newState=CONNECTING reason=CONNECT_REQUESTED")
         } else {
             // Host mode: Don't set CONNECTING state so the UI remains responsive for outbound connects.
-            // We just ensure we are not already connected.
             if (_connectionState.value == ConnectionState.CONNECTED) return
+            _connectionState.value = ConnectionState.DISCONNECTED
+            Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=DISCONNECTED reason=HOST_STARTED")
         }
         
         _lastError.value = null
@@ -60,10 +63,8 @@ class WiFiTransport : Transport {
         transportScope.launch {
             try {
                 if (isHosting) {
-                    // Host mode: Start ServerSocket
                     startServer()
                 } else {
-                    // Client mode: Connect to IP with 10s timeout per Phase 12A
                     withTimeout(10000L) {
                         startClient(targetId)
                     }
@@ -73,19 +74,30 @@ class WiFiTransport : Transport {
                 _lastError.value = "Connection timed out"
                 if (!isHosting) {
                     _connectionState.value = ConnectionState.ERROR
+                    Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=ERROR previousState=CONNECTING newState=ERROR reason=TIMEOUT")
+                    cleanup()
+                    // Auto-recover to DISCONNECTED per Phase 12C specification so CONNECT is immediately enabled again
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                    Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=DISCONNECTED previousState=ERROR newState=DISCONNECTED reason=RECOVERED_TO_DISCONNECTED")
+                } else {
+                    cleanup()
+                    _connectionState.value = ConnectionState.DISCONNECTED
                 }
-                cleanup()
             } catch (e: Exception) {
                 if (isActive) {
-                    Log.e(TAG, "Connection failed", e)
+                    Log.e(TAG, "Connection failed: ${e.message}", e)
                     _lastError.value = e.message
                     if (!isHosting) {
                         _connectionState.value = ConnectionState.ERROR
+                        Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=ERROR previousState=CONNECTING newState=ERROR reason=CONNECTION_FAILED")
+                        cleanup()
+                        // Auto-recover to DISCONNECTED per Phase 12C specification so CONNECT is immediately enabled again
+                        _connectionState.value = ConnectionState.DISCONNECTED
+                        Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=DISCONNECTED previousState=ERROR newState=DISCONNECTED reason=RECOVERED_TO_DISCONNECTED")
                     } else {
-                        // If hosting fails (e.g. BindException), ensure we are DISCONNECTED
+                        cleanup()
                         _connectionState.value = ConnectionState.DISCONNECTED
                     }
-                    cleanup()
                 }
             }
         }
@@ -93,8 +105,12 @@ class WiFiTransport : Transport {
 
     private suspend fun startServer() = withContext(Dispatchers.IO) {
         try {
-            serverSocket = ServerSocket(PORT).apply {
+            try {
+                serverSocket?.close()
+            } catch (ignored: Exception) {}
+            serverSocket = ServerSocket().apply {
                 reuseAddress = true
+                bind(java.net.InetSocketAddress(PORT))
             }
             Log.d(TAG, "Server started on port $PORT, waiting for connection...")
             
@@ -119,10 +135,12 @@ class WiFiTransport : Transport {
     }
 
     private fun setupConnection(socket: Socket) {
+        val prev = _connectionState.value
         socket.tcpNoDelay = true
         clientSocket = socket
         writer = PrintWriter(socket.getOutputStream(), true)
         _connectionState.value = ConnectionState.CONNECTED
+        Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=CONNECTED previousState=$prev newState=CONNECTED reason=SOCKET_CONNECTED")
         Log.i(TAG, "Connected to ${socket.inetAddress.hostAddress}")
 
         startReceiving(socket)
@@ -146,6 +164,7 @@ class WiFiTransport : Transport {
                     Log.e(TAG, "Receiver error", e)
                     _lastError.value = "Connection lost: ${e.message}"
                     _connectionState.value = ConnectionState.ERROR
+                    Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=ERROR previousState=CONNECTED newState=ERROR reason=CONNECTION_LOST")
                 }
             } finally {
                 disconnect()
@@ -173,11 +192,11 @@ class WiFiTransport : Transport {
     }
 
     override fun disconnect() {
-        if (_connectionState.value == ConnectionState.DISCONNECTED && clientSocket == null) return
-        
-        Log.d(TAG, "Disconnecting...")
+        val prev = _connectionState.value
+        Log.d(TAG, "Disconnecting (previousState=$prev)...")
         _connectionState.value = ConnectionState.DISCONNECTED
         cleanup()
+        Log.i(TAG, "[WIFI-STATE] selectedTransport=WIFI connectionState=DISCONNECTED previousState=$prev newState=DISCONNECTED reason=DISCONNECT")
     }
 
     private fun cleanup() {

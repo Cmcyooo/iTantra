@@ -66,6 +66,7 @@ class TransceiverManager(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     private var lastSentText: String = ""
+    private var lastProcessedUtteranceId: String? = null
     private var lastReceivedText: String = ""
     private var pendingAckAlertId: String? = null
 
@@ -144,13 +145,33 @@ class TransceiverManager(
                 }
             }
             state.sttStatus == SttStatus.COMPLETE && state.recognizedText.isNotEmpty() -> {
-                if (state.recognizedText != lastSentText) {
+                val utteranceId = state.utteranceId ?: state.recognizedText.hashCode().toString()
+                if (utteranceId != lastProcessedUtteranceId) {
                     sttEndTime = android.os.SystemClock.elapsedRealtime()
+                    lastProcessedUtteranceId = utteranceId
                     lastSentText = state.recognizedText
+                    val sttLatencyMs = if (sttEndTime >= sttStartTime && sttStartTime > 0) sttEndTime - sttStartTime else (state.lastSttResult?.processingTimeMs ?: 0L)
+                    val activeLang = audioManager.languageModelManager.currentLanguage.value.code
+                    Log.i(TAG, "[TX-STT] utteranceId=$utteranceId language=$activeLang latency=${sttLatencyMs}ms")
+
                     if (_isEmergencyMode.value) {
-                        sendRecognizedAlert(state.recognizedText)
+                        sendRecognizedAlert(state.recognizedText, utteranceId)
                     } else {
-                        sendRecognizedText(state.recognizedText)
+                        sendRecognizedText(state.recognizedText, utteranceId)
+                    }
+                }
+            }
+            state.sttStatus == SttStatus.ERROR -> {
+                val utteranceId = state.utteranceId
+                if (utteranceId != null && utteranceId != lastProcessedUtteranceId) {
+                    lastProcessedUtteranceId = utteranceId
+                    Log.e(TAG, "[TX-STT] utteranceId=$utteranceId STT FAILED")
+                    _uiState.value = TransceiverState.ERROR
+                    scope.launch {
+                        delay(2000.milliseconds)
+                        if (_uiState.value == TransceiverState.ERROR) {
+                            _uiState.value = TransceiverState.IDLE
+                        }
                     }
                 }
             }
@@ -160,7 +181,8 @@ class TransceiverManager(
             _uiState.value != TransceiverState.PLAYING && 
             _uiState.value != TransceiverState.RECEIVING &&
             _uiState.value != TransceiverState.FORWARDING &&
-            _uiState.value != TransceiverState.SENT -> 
+            _uiState.value != TransceiverState.SENT &&
+            _uiState.value != TransceiverState.ERROR -> 
                 _uiState.value = TransceiverState.IDLE
         }
     }
@@ -182,39 +204,49 @@ class TransceiverManager(
         }
     }
 
-    private fun sendRecognizedText(text: String) {
+    private fun sendRecognizedText(text: String, utteranceId: String = java.util.UUID.randomUUID().toString()) {
         scope.launch {
             val sendStartTime = android.os.SystemClock.elapsedRealtime()
             _uiState.value = TransceiverState.FORWARDING
             val activeLang = audioManager.languageModelManager.currentLanguage.value.code
-            val sentMsg = commManager.sendText(
-                text = text,
-                language = activeLang,
-                senderName = callSignManager.getCallSign()
-            )
-            val sendEndTime = android.os.SystemClock.elapsedRealtime()
-            
-            val pttToSttMs = if (pttReleaseTime > 0 && sttStartTime >= pttReleaseTime) "${sttStartTime - pttReleaseTime}ms" else "N/A"
-            val sttDurationMs = if (sttEndTime >= sttStartTime && sttStartTime > 0) "${sttEndTime - sttStartTime}ms" else "N/A"
-            val sttEndToSendStartMs = if (sttEndTime > 0) "${sendStartTime - sttEndTime}ms" else "N/A"
-            val sendDurationMs = "${sendEndTime - sendStartTime}ms"
+            try {
+                val sentMsg = commManager.sendText(
+                    text = text,
+                    language = activeLang,
+                    senderName = callSignManager.getCallSign(),
+                    utteranceId = utteranceId
+                )
+                val sendEndTime = android.os.SystemClock.elapsedRealtime()
+                
+                val pttToSttMs = if (pttReleaseTime > 0 && sttStartTime >= pttReleaseTime) "${sttStartTime - pttReleaseTime}ms" else "N/A"
+                val sttDurationMs = if (sttEndTime >= sttStartTime && sttStartTime > 0) "${sttEndTime - sttStartTime}ms" else "N/A"
+                val sttEndToSendStartMs = if (sttEndTime > 0) "${sendStartTime - sttEndTime}ms" else "N/A"
+                val sendDurationMs = "${sendEndTime - sendStartTime}ms"
 
-            Log.i(
-                TAG,
-                "[TELEMETRY-SENDER] utteranceId=${sentMsg.utteranceId} language=$activeLang STT_language=$activeLang " +
-                "PTT_RELEASE->STT_START=$pttToSttMs STT_START->STT_END=$sttDurationMs " +
-                "STT_END->SEND_START=$sttEndToSendStartMs SEND_START->SEND_COMPLETE=$sendDurationMs"
-            )
-            
-            _uiState.value = TransceiverState.SENT
-            delay(1500.milliseconds) // Show "SENT" for a bit
-            if (_uiState.value == TransceiverState.SENT) {
-                _uiState.value = TransceiverState.IDLE
+                Log.i(
+                    TAG,
+                    "[TELEMETRY-SENDER] utteranceId=${sentMsg.utteranceId} language=$activeLang STT_language=$activeLang " +
+                    "PTT_RELEASE->STT_START=$pttToSttMs STT_START->STT_END=$sttDurationMs " +
+                    "STT_END->SEND_START=$sttEndToSendStartMs SEND_START->SEND_COMPLETE=$sendDurationMs"
+                )
+                
+                _uiState.value = TransceiverState.SENT
+                delay(1500.milliseconds) // Show "SENT" for a bit
+                if (_uiState.value == TransceiverState.SENT) {
+                    _uiState.value = TransceiverState.IDLE
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send normal message for utteranceId=$utteranceId", e)
+                _uiState.value = TransceiverState.ERROR
+                delay(2000.milliseconds)
+                if (_uiState.value == TransceiverState.ERROR) {
+                    _uiState.value = TransceiverState.IDLE
+                }
             }
         }
     }
 
-    private fun sendRecognizedAlert(text: String) {
+    private fun sendRecognizedAlert(text: String, utteranceId: String = java.util.UUID.randomUUID().toString()) {
         scope.launch {
             val sendStartTime = android.os.SystemClock.elapsedRealtime()
             _lastAlertText.value = text
@@ -224,6 +256,10 @@ class TransceiverManager(
                 Log.w(TAG, "🚨 Alert cannot be delivered: Transport not connected")
                 _alertDeliveryStatus.value = AlertDeliveryStatus.FAILED
                 _uiState.value = TransceiverState.ERROR
+                delay(2000.milliseconds)
+                if (_uiState.value == TransceiverState.ERROR) {
+                    _uiState.value = TransceiverState.IDLE
+                }
                 return@launch
             }
 
@@ -233,7 +269,8 @@ class TransceiverManager(
                 val sentMsg = commManager.sendAlert(
                     text = text,
                     language = activeLang,
-                    senderName = callSignManager.getCallSign()
+                    senderName = callSignManager.getCallSign(),
+                    utteranceId = utteranceId
                 )
                 val sendEndTime = android.os.SystemClock.elapsedRealtime()
                 val pttToSttMs = if (pttReleaseTime > 0 && sttStartTime >= pttReleaseTime) "${sttStartTime - pttReleaseTime}ms" else "N/A"
@@ -261,9 +298,13 @@ class TransceiverManager(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to send alert", e)
+                Log.e(TAG, "Failed to send alert for utteranceId=$utteranceId", e)
                 _alertDeliveryStatus.value = AlertDeliveryStatus.FAILED
                 _uiState.value = TransceiverState.ERROR
+                delay(2000.milliseconds)
+                if (_uiState.value == TransceiverState.ERROR) {
+                    _uiState.value = TransceiverState.IDLE
+                }
             }
         }
     }
