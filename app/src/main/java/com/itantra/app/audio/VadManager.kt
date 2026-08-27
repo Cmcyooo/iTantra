@@ -91,10 +91,7 @@ class VadManager(context: Context) {
         val status: VadStatus
     )
 
-    /**
-     * Backward-compatible result alias for VadDecision.
-     */
-    typealias VadProcessResult = VadDecision
+
 
     /**
      * Processes a chunk of normalized Float PCM samples.
@@ -176,3 +173,8 @@ class VadManager(context: Context) {
         vad = null
     }
 }
+
+/**
+ * Backward-compatible typealias for VadDecision.
+ */
+typealias VadProcessResult = VadManager.VadDecision

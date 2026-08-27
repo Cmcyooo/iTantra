@@ -53,17 +53,45 @@ class AudioCaptureManager(private val context: Context) {
     val languageModelManager: LanguageModelManager
         get() = LanguageModelManager.getInstance(context)
 
+    /**
+     * Explicit VAD capture states for Phase 12B onset recovery.
+     */
+    enum class CaptureState {
+        IDLE,
+        LISTENING,
+        LIKELY_SPEECH,
+        SPEAKING,
+        ENDING
+    }
+
+    /**
+     * Timestamped chunk stored in bounded rolling history.
+     */
+    data class HistoryChunk(
+        val sequence: Long,
+        val samples: FloatArray,
+        val probability: Float
+    )
+
+    var captureState: CaptureState = CaptureState.IDLE
+        private set
+
     // Accumulates audio samples during active speech
     private val speechAccumulator = mutableListOf<FloatArray>()
     private var speechSamplesCount = 0
 
-    // Pre-speech circular buffer (~320ms at 16kHz) to guarantee first syllable is never truncated
-    private val preSpeechRingBuffer = java.util.ArrayDeque<FloatArray>()
-    private val PRE_SPEECH_MAX_CHUNKS = 10
+    // Bounded rolling history buffer: 40 chunks * 512 samples = 20,480 samples = 1.28 seconds
+    private val rollingHistory = java.util.ArrayDeque<HistoryChunk>()
+    private val MAX_HISTORY_CHUNKS = 40
+    private val PRE_SPEECH_PADDING_CHUNKS = 8 // 8 * 32ms = ~256ms pre-speech padding before onset
+    private val ONSET_PROB_THRESHOLD = 0.40f
+    private val ONSET_CONSECUTIVE_CHUNKS = 2 // 2 * 32ms = 64ms temporal consistency debouncer
+    private val SILENCE_ENDPOINT_CHUNKS = 22 // 22 * 32ms = ~704ms silence endpointing
 
-    // Accumulates audio samples during PTT hold for immediate fallback
-    private val pttAccumulator = mutableListOf<FloatArray>()
-    private var pttSamplesCount = 0
+    private var chunkSequence = 0L
+    private var lastAppendedSequence = -1L
+    private var consecutiveElevatedCount = 0
+    private var consecutiveSilenceCount = 0
 
     // Monotonic timing for latency diagnostics (Phase 12A)
     var tPttPressNano: Long = 0L
@@ -165,8 +193,13 @@ class AudioCaptureManager(private val context: Context) {
             audioRecord = record
             speechAccumulator.clear()
             speechSamplesCount = 0
-            pttAccumulator.clear()
-            pttSamplesCount = 0
+            rollingHistory.clear()
+            consecutiveElevatedCount = 0
+            consecutiveSilenceCount = 0
+            lastAppendedSequence = -1L
+            chunkSequence = 0L
+            captureState = CaptureState.LISTENING
+
             Log.d(TAG, "AudioRecord started. State: ${record.state}, RecordingState: ${record.recordingState}")
             _state.value = AudioState(
                 isRecording = true,
@@ -222,25 +255,16 @@ class AudioCaptureManager(private val context: Context) {
                         floatChunk[i] = buffer[i] / 32768.0f
                     }
 
-                    // Always accumulate into pttAccumulator while PTT recording is active (max 30s)
-                    if (pttSamplesCount < sampleRate * 30) {
-                        pttAccumulator.add(floatChunk.copyOf())
-                        pttSamplesCount += floatChunk.size
-                    }
-
                     // Process VAD with the float chunk we just converted
                     val vm = vadManager
-                    if (vm == null) {
-                        Log.e(TAG, "[PTT-DIAG] VAD Manager is null during capture loop!")
-                    }
-                    val vadResult = vm?.processWithProbability(floatChunk)
-                    val currentVadStatus = vadResult?.status ?: VadStatus.SILENCE
-                    val vadProbability = vadResult?.probability ?: 0.0f
+                    val decision = vm?.processDecision(floatChunk) ?: VadManager.VadDecision(0.0f, false, VadStatus.SILENCE)
+                    val currentVadStatus = decision.status
+                    val vadProbability = decision.probability
 
                     // Log [PTT-VAD] diagnostic log per Phase 12A specification
                     Log.i(TAG, "[PTT-VAD] chunkSamples=$readCount rms=${String.format(java.util.Locale.US, "%.2f", latestRms)} rmsNorm=${String.format(java.util.Locale.US, "%.4f", latestRmsNorm)} vadProbability=${String.format(java.util.Locale.US, "%.3f", vadProbability)} state=$currentVadStatus")
 
-                    if ((currentVadStatus == VadStatus.SPEECH_DETECTED || currentVadStatus == VadStatus.SPEAKING) && tVadSpeechStartNano == 0L) {
+                    if ((currentVadStatus == VadStatus.SPEECH_DETECTED || currentVadStatus == VadStatus.SPEAKING || captureState == CaptureState.SPEAKING) && tVadSpeechStartNano == 0L) {
                         tVadSpeechStartNano = System.nanoTime()
                     }
                     if (currentVadStatus == VadStatus.SPEECH_ENDED && tVadSpeechEndNano == 0L) {
@@ -248,7 +272,7 @@ class AudioCaptureManager(private val context: Context) {
                     }
 
                     // Handle speech accumulation and STT triggering
-                    handleSpeechTransitions(currentVadStatus, floatChunk)
+                    handleSpeechTransitions(decision, floatChunk)
 
                     // Deliver PCM chunk to consumer (e.g., future VAD) without copying if possible
                     onAudioChunkCaptured?.invoke(buffer, readCount)
@@ -310,20 +334,28 @@ class AudioCaptureManager(private val context: Context) {
         _state.value = _state.value.copy(isRecording = false)
         
         if (forceFinalize) {
-            val audioToTranscribe = if (speechAccumulator.isNotEmpty() && speechSamplesCount >= sampleRate * 0.2) {
+            val audioToTranscribe = if (speechAccumulator.isNotEmpty() && speechSamplesCount >= sampleRate * 0.15) {
+                Log.i(TAG, "[PTT-DIAG] Force-finalizing from speechAccumulator ($speechSamplesCount samples)")
                 flattenAccumulator()
-            } else if (pttAccumulator.isNotEmpty() && pttSamplesCount >= sampleRate * 0.2) {
-                // User spoke briefly (>= 200ms) before VAD fired or during low volume
-                Log.i(TAG, "[PTT-DIAG] Finalizing from PTT rolling buffer ($pttSamplesCount samples)")
-                flattenPttAccumulator()
+            } else if (rollingHistory.isNotEmpty()) {
+                val historyData = flattenRollingHistory()
+                if (historyData.size >= sampleRate * 0.15) {
+                    Log.i(TAG, "[PTT-DIAG] Force-finalizing from rollingHistory (${historyData.size} samples)")
+                    historyData
+                } else {
+                    null
+                }
             } else {
                 null
             }
 
             speechAccumulator.clear()
             speechSamplesCount = 0
-            pttAccumulator.clear()
-            pttSamplesCount = 0
+            rollingHistory.clear()
+            consecutiveElevatedCount = 0
+            consecutiveSilenceCount = 0
+            lastAppendedSequence = -1L
+            captureState = CaptureState.IDLE
 
             if (audioToTranscribe != null) {
                 runStt(audioToTranscribe)
@@ -331,8 +363,11 @@ class AudioCaptureManager(private val context: Context) {
         } else {
             speechAccumulator.clear()
             speechSamplesCount = 0
-            pttAccumulator.clear()
-            pttSamplesCount = 0
+            rollingHistory.clear()
+            consecutiveElevatedCount = 0
+            consecutiveSilenceCount = 0
+            lastAppendedSequence = -1L
+            captureState = CaptureState.IDLE
         }
 
         recordingJob?.cancel()
@@ -378,56 +413,99 @@ class AudioCaptureManager(private val context: Context) {
 
     /**
      * Handles accumulation of audio during speech and triggers STT when speech ends.
+     * Phase 12B: Probability-assisted onset recovery from bounded rolling history.
      */
-    private fun handleSpeechTransitions(vadStatus: VadStatus, floatChunk: FloatArray) {
-        when (vadStatus) {
-            VadStatus.SPEECH_DETECTED, VadStatus.SPEAKING -> {
-                if (speechSamplesCount == 0) {
-                    val preChunksCount = preSpeechRingBuffer.size
-                    Log.i(TAG, "[PTT-DIAG] Speech detected by VAD. Prepending $preChunksCount pre-speech chunks to preserve first syllable.")
-                    while (preSpeechRingBuffer.isNotEmpty()) {
-                        val pastChunk = preSpeechRingBuffer.removeFirst()
-                        speechAccumulator.add(pastChunk)
-                        speechSamplesCount += pastChunk.size
+    fun handleSpeechTransitions(decision: VadManager.VadDecision, floatChunk: FloatArray) {
+        // 1. Add current chunk to bounded rolling history
+        val historyChunk = HistoryChunk(
+            sequence = chunkSequence,
+            samples = floatChunk.copyOf(),
+            probability = decision.probability
+        )
+        rollingHistory.addLast(historyChunk)
+        if (rollingHistory.size > MAX_HISTORY_CHUNKS) {
+            rollingHistory.removeFirst()
+        }
+
+        // 2. Update temporal consistency debouncing counters
+        if (decision.probability >= ONSET_PROB_THRESHOLD) {
+            consecutiveElevatedCount++
+            consecutiveSilenceCount = 0
+        } else {
+            consecutiveElevatedCount = 0
+            consecutiveSilenceCount++
+        }
+
+        // 3. State machine transitions
+        when (captureState) {
+            CaptureState.IDLE, CaptureState.LISTENING -> {
+                val isOnset = (consecutiveElevatedCount >= ONSET_CONSECUTIVE_CHUNKS) || decision.nativeSpeechDetected
+                if (isOnset) {
+                    captureState = CaptureState.LIKELY_SPEECH
+
+                    // Onset chunk is the earliest elevated chunk in this contiguous burst
+                    val onsetSeq = (chunkSequence - consecutiveElevatedCount + 1).coerceAtLeast(0L)
+                    val targetStartSeq = (onsetSeq - PRE_SPEECH_PADDING_CHUNKS).coerceAtLeast(0L)
+
+                    speechAccumulator.clear()
+                    speechSamplesCount = 0
+                    for (hc in rollingHistory) {
+                        if (hc.sequence >= targetStartSeq && hc.sequence <= chunkSequence) {
+                            speechAccumulator.add(hc.samples)
+                            speechSamplesCount += hc.samples.size
+                            lastAppendedSequence = hc.sequence
+                        }
                     }
-                }
-                // Limit to 30 seconds to prevent OOM
-                if (speechSamplesCount < sampleRate * 30) {
-                    speechAccumulator.add(floatChunk.copyOf())
-                    speechSamplesCount += floatChunk.size
-                    
+
+                    // Required Phase 12B diagnostic log
+                    Log.i(TAG, "[PTT-VAD-EVENT] LIKELY_SPEECH_ONSET onsetChunk=$onsetSeq onsetProbability=${String.format(java.util.Locale.US, "%.3f", decision.probability)} historySamples=$speechSamplesCount")
+
+                    captureState = CaptureState.SPEAKING
                     if (_state.value.sttStatus != SttStatus.SPEECH_DETECTED) {
                         _state.value = _state.value.copy(sttStatus = SttStatus.SPEECH_DETECTED)
                     }
+                } else {
+                    if (_state.value.sttStatus != SttStatus.IDLE && _state.value.sttStatus != SttStatus.COMPLETE) {
+                        _state.value = _state.value.copy(sttStatus = SttStatus.IDLE)
+                    }
                 }
             }
-            VadStatus.SPEECH_ENDED -> {
-                if (speechAccumulator.isNotEmpty()) {
-                    Log.i(TAG, "[PTT-DIAG] Speech endpoint reached (silence detected)")
+            CaptureState.LIKELY_SPEECH, CaptureState.SPEAKING -> {
+                // Append incoming chunk if not already added during history recovery
+                if (chunkSequence > lastAppendedSequence) {
+                    if (speechSamplesCount < sampleRate * 30) {
+                        speechAccumulator.add(floatChunk.copyOf())
+                        speechSamplesCount += floatChunk.size
+                        lastAppendedSequence = chunkSequence
+                    }
+                }
+
+                // Check for speech endpoint:
+                // a) Native VAD SPEECH_ENDED
+                // b) Silence duration >= SILENCE_ENDPOINT_CHUNKS (700ms) with at least 150ms of speech accumulated
+                val isEndpoint = (decision.status == VadStatus.SPEECH_ENDED) ||
+                        (consecutiveSilenceCount >= SILENCE_ENDPOINT_CHUNKS && speechSamplesCount >= sampleRate * 0.15)
+
+                if (isEndpoint) {
+                    Log.i(TAG, "[PTT-DIAG] Speech endpoint reached (silence detected). Finalizing utterance (${speechSamplesCount} samples).")
+                    captureState = CaptureState.ENDING
                     val speechData = flattenAccumulator()
                     speechAccumulator.clear()
                     speechSamplesCount = 0
-                    preSpeechRingBuffer.clear()
-                    pttAccumulator.clear()
-                    pttSamplesCount = 0
-                    
-                    // Trigger STT in background
+                    rollingHistory.clear()
+                    consecutiveElevatedCount = 0
+                    consecutiveSilenceCount = 0
+                    lastAppendedSequence = -1L
+
                     runStt(speechData)
+                    captureState = CaptureState.LISTENING
                 }
             }
-            VadStatus.SILENCE -> {
-                // Keep circular buffer of recent audio (~320ms) while waiting for speech
-                preSpeechRingBuffer.addLast(floatChunk.copyOf())
-                if (preSpeechRingBuffer.size > PRE_SPEECH_MAX_CHUNKS) {
-                    preSpeechRingBuffer.removeFirst()
-                }
-
-                if (_state.value.sttStatus != SttStatus.IDLE && _state.value.sttStatus != SttStatus.COMPLETE) {
-                    // Reset to idle if we were expecting speech but got silence
-                    _state.value = _state.value.copy(sttStatus = SttStatus.IDLE)
-                }
+            CaptureState.ENDING -> {
+                captureState = CaptureState.LISTENING
             }
         }
+        chunkSequence++
     }
 
     private fun flattenAccumulator(): FloatArray {
@@ -440,14 +518,45 @@ class AudioCaptureManager(private val context: Context) {
         return result
     }
 
-    private fun flattenPttAccumulator(): FloatArray {
-        val result = FloatArray(pttSamplesCount)
+    private fun flattenRollingHistory(): FloatArray {
+        val total = rollingHistory.sumOf { it.samples.size }
+        val result = FloatArray(total)
         var offset = 0
-        for (chunk in pttAccumulator) {
-            chunk.copyInto(result, offset)
-            offset += chunk.size
+        for (chunk in rollingHistory) {
+            chunk.samples.copyInto(result, offset)
+            offset += chunk.samples.size
         }
         return result
+    }
+
+    /**
+     * Diagnostic helper: feeds a single 512-sample float chunk through the VAD and capture state machine.
+     */
+    fun processAudioChunk(floatChunk: FloatArray): VadManager.VadDecision {
+        val vm = vadManager ?: VadManager(context).also { vadManager = it }
+        val decision = vm.processDecision(floatChunk)
+        handleSpeechTransitions(decision, floatChunk)
+        return decision
+    }
+
+    /**
+     * Diagnostic helper: returns the currently accumulated speech buffer.
+     */
+    fun getAccumulatedSpeech(): FloatArray = flattenAccumulator()
+
+    /**
+     * Diagnostic helper: resets capture state machine and clears all history buffers.
+     */
+    fun resetCaptureState() {
+        speechAccumulator.clear()
+        speechSamplesCount = 0
+        rollingHistory.clear()
+        consecutiveElevatedCount = 0
+        consecutiveSilenceCount = 0
+        lastAppendedSequence = -1L
+        chunkSequence = 0L
+        captureState = CaptureState.LISTENING
+        vadManager?.reset()
     }
 
     data class SttAudioMetrics(
@@ -548,7 +657,7 @@ class AudioCaptureManager(private val context: Context) {
     private fun runStt(samples: FloatArray) {
         scope.launch {
             val metrics = analyzeSttAudio(samples)
-            // Log [PTT-STT-AUDIO] per Phase 12A specification
+            // Log [PTT-STT-AUDIO] per Phase 12A/12B specification
             Log.i(TAG, "[PTT-STT-AUDIO] sampleCount=${metrics.sampleCount} duration=${String.format(java.util.Locale.US, "%.2f", metrics.duration)}s rms=${String.format(java.util.Locale.US, "%.4f", metrics.rms)} peak=${String.format(java.util.Locale.US, "%.4f", metrics.peak)} leadingSilence=${String.format(java.util.Locale.US, "%.2f", metrics.leadingSilence)}s trailingSilence=${String.format(java.util.Locale.US, "%.2f", metrics.trailingSilence)}s")
 
             // Save debug WAV for controlled debug inspection (requirement 6)
@@ -566,6 +675,10 @@ class AudioCaptureManager(private val context: Context) {
             val result = sttManager?.transcribe(samples)
             tSttEndNano = System.nanoTime()
             val elapsed = System.currentTimeMillis() - t0
+
+            val resultLength = result?.text?.length ?: 0
+            // Log [STT-RESULT] per Phase 12B specification
+            Log.i(TAG, "[STT-RESULT] latency=${elapsed}ms resultLength=$resultLength")
 
             val pttToAudioStartMs = if (tPttPressNano > 0 && tAudioRecordStartNano > 0) (tAudioRecordStartNano - tPttPressNano) / 1_000_000.0 else 0.0
             val vadSpeechDurationMs = if (tVadSpeechStartNano > 0 && tVadSpeechEndNano > 0) (tVadSpeechEndNano - tVadSpeechStartNano) / 1_000_000.0 else 0.0
