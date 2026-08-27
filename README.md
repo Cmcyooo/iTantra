@@ -1,276 +1,816 @@
-# iTantra
+iTantra
 
-### Indian Multilingual TTS & STT Aided Neural Transceiver for Low-Bitrate Links
+Indian Multilingual TTS & STT Aided Neural Transceiver for Low-Bitrate Links
 
-**SIH 2026 — Problem Statement 26173**
+SIH 2026 — Problem Statement 26173
 
-iTantra is an **offline, multilingual voice communication system for Android** designed for low-bandwidth and constrained-device environments.
+iTantra is an offline, multilingual voice communication system for Android designed for low-bandwidth, constrained-device and emergency communication scenarios.
 
-Instead of transmitting audio directly, iTantra converts speech into text, transmits the compact text representation over a local link, and reconstructs the speech on the receiving device.
+Instead of transmitting speech audio directly, iTantra converts speech into text locally, transmits the compact text representation over an available communication link, and reconstructs the speech on the receiving device.
 
-This enables a lightweight, low-bitrate, voice-first communication system that can operate **without internet connectivity**.
-
----
-
-## 🚨 Problem
-
-Voice communication is data-intensive, making direct audio transmission inefficient over low-data-rate links.
-
-This is particularly important in:
-
-* Emergency and distress communication
-* Low-bandwidth environments
-* Areas with unreliable connectivity
-* Situations where voice is more inclusive than written communication
-
-iTantra addresses this by transmitting **text instead of raw audio**.
-
-```text
 Speech
-  ↓
+   ↓
 Offline STT
-  ↓
+   ↓
 Text
-  ↓
-Low-Bitrate Local Transport
-  ↓
+   ↓
+Wi-Fi / Wi-Fi Direct / Bluetooth
+   ↓
 Text
-  ↓
+   ↓
 Offline TTS
-  ↓
+   ↓
 Speech
-```
 
----
+This approach significantly reduces the amount of data that needs to cross the communication link while keeping speech processing on-device.
 
-## 🎯 Objectives
+🚨 Problem
+
+Traditional voice communication requires transmission of audio data.
+
+Audio transmission becomes inefficient when communication links have:
+
+Low data rates
+
+Limited throughput
+
+Unstable connectivity
+
+Limited device resources
+
+Communication constraints during emergency situations
+
+This is particularly important for:
+
+Emergency and distress communication
+
+Low-bandwidth environments
+
+Areas with unreliable connectivity
+
+Field communication
+
+Local peer-to-peer communication
+
+Situations where voice communication is more accessible than typing
+
+iTantra addresses this by transmitting recognized text instead of the original speech waveform.
+
+User Speech
+     ↓
+Local Speech Recognition
+     ↓
+Recognized Text
+     ↓
+Compact Network Packet
+     ↓
+Low-Bitrate Communication Link
+     ↓
+Received Text
+     ↓
+Local Speech Synthesis
+     ↓
+Voice Playback
+
+Core Principle
+
+Transmit the meaning, not the audio waveform.
+
+🎯 Objectives
 
 iTantra is designed to:
 
-* Work **fully offline**
-* Run on **low-end and mid-range Android devices**
-* Support **10 required languages**
-* Minimize RAM, CPU and storage usage
-* Maintain low end-to-end latency
-* Use open-source technologies
-* Support Wi-Fi and Bluetooth based peer-to-peer communication
-* Provide a walkie-talkie style push-to-talk experience
-* Support phone-like continuous communication
-* Support high-priority emergency/alert announcements
+Work fully offline
 
-### Required Languages
+Run AI inference locally on Android devices
 
-1. Hindi
-2. Gujarati
-3. Marathi
-4. Kannada
-5. Malayalam
-6. Tamil
-7. Telugu
-8. Odia
-9. Bengali
-10. English
+Support the 10 languages specified by SIH PS 26173
 
----
+Minimize RAM, CPU and storage usage
 
-## 🧠 Core Architecture
+Maintain low end-to-end latency
 
-```text
-                     PHONE A
-                        │
-                    🎙️ Speech
-                        │
-                        ▼
-                 ┌─────────────┐
-                 │ Silero VAD  │
-                 └──────┬──────┘
-                        │
-                  Speech segment
-                        │
-                        ▼
-              ┌──────────────────┐
-              │ Whisper STT       │
-              │ Offline / INT8    │
-              └────────┬─────────┘
+Use open-source technologies and models
+
+Support Wi-Fi-based peer communication
+
+Support Wi-Fi Direct peer-to-peer communication
+
+Support Bluetooth communication
+
+Provide a walkie-talkie style Push-to-Talk experience
+
+Provide high-priority emergency communication
+
+Support modular language-specific STT/TTS models
+
+Operate on low- and mid-range Android hardware
+
+🌍 Required Languages
+
+The problem statement specifies the following 10 languages:
+
+Hindi
+
+Gujarati
+
+Marathi
+
+Kannada
+
+Malayalam
+
+Tamil
+
+Telugu
+
+Odia
+
+Bengali
+
+English
+
+iTantra uses language-specific model selection rather than assuming that one model will provide equally strong performance across every Indian language.
+
+🧠 Core Architecture
+
+                          PHONE A
+                             │
+                             ▼
+                       🎙️ User Speech
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │  Audio Capture  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   Silero VAD    │
+                    └────────┬────────┘
+                             │
+                   Speech End / Release
+                             │
+                             ▼
+                   ┌───────────────────┐
+                   │  Language Manager │
+                   └─────────┬─────────┘
+                             │
+                             ▼
+                      Active STT Model
+                             │
+                             ▼
+                           Text
+                             │
+                             ▼
+                ┌────────────────────────┐
+                │ Communication Manager  │
+                └────────────┬───────────┘
+                             │
+                  ┌──────────┼──────────┐
+                  │          │          │
+                  ▼          ▼          ▼
+                Wi-Fi    Wi-Fi Direct  Bluetooth
+                  │          │          │
+                  └──────────┼──────────┘
+                             │
+                             ▼
+                           PHONE B
+                             │
+                         Received Text
+                             │
+                             ▼
+                   ┌────────────────────┐
+                   │   TTS Manager      │
+                   └─────────┬──────────┘
+                             │
+                       Active TTS Voice
+                             │
+                             ▼
+                         🔊 Speech
+
+📡 Key Design Principle
+
+Audio is not transmitted between phones.
+
+The communication payload is:
+
+Speech
+  ↓
+STT
+  ↓
+Text + Metadata
+  ↓
+Network
+  ↓
+Text + Metadata
+  ↓
+TTS
+  ↓
+Speech
+
+The transport layer therefore carries compact text rather than raw microphone audio.
+
+This makes the communication architecture suitable for low-data-rate links.
+
+🏗️ System Architecture
+
+iTantra is divided into modular layers.
+
+┌─────────────────────────────────────────────┐
+│                 UI LAYER                    │
+│ Language Selection / PTT / Alerts / Status │
+└──────────────────────┬──────────────────────┘
                        │
-                     Text
+┌──────────────────────▼──────────────────────┐
+│                AUDIO LAYER                  │
+│ AudioRecord / VAD / Buffer / AudioTrack     │
+└──────────────────────┬──────────────────────┘
                        │
-                       ▼
-             ┌────────────────────┐
-             │ Wi-Fi / Bluetooth  │
-             │ Local Transport    │
-             └─────────┬──────────┘
+┌──────────────────────▼──────────────────────┐
+│                 STT LAYER                   │
+│ LanguageModelManager                        │
+│ Whisper / Wav2Vec2 CTC / ONNX Runtime       │
+└──────────────────────┬──────────────────────┘
                        │
-                       │ Text
-                       ▼
-                     PHONE B
+┌──────────────────────▼──────────────────────┐
+│                 TEXT LAYER                  │
+│ Normalization / Language / Metadata         │
+└──────────────────────┬──────────────────────┘
                        │
-                       ▼
-              ┌──────────────────┐
-              │ Lightweight TTS  │
-              │ Piper / VITS     │
-              └────────┬─────────┘
+┌──────────────────────▼──────────────────────┐
+│              TRANSPORT LAYER                │
+│ Wi-Fi / Wi-Fi Direct / Bluetooth / ACK      │
+└──────────────────────┬──────────────────────┘
                        │
-                       ▼
-                    🔊 Speech
-```
+┌──────────────────────▼──────────────────────┐
+│                 TTS LAYER                   │
+│ LanguageTtsManager / Piper / VITS / MMS     │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────┐
+│                AUDIO OUTPUT                 │
+│                   Speaker                   │
+└─────────────────────────────────────────────┘
 
-### Key design principle
+🛠️ Technology Stack
 
-**Audio is not transmitted between phones.**
+Android
 
-Only compact text is transmitted:
+Kotlin
 
-```text
-Speech → STT → Text → Network → Text → TTS → Speech
-```
+Jetpack Compose
 
-This significantly reduces communication bandwidth compared with transmitting raw audio.
+Android SDK
 
----
+Minimum SDK: API 24
 
-## 🛠️ Technology Stack
+Audio
 
-### Android
+Android AudioRecord
 
-* Kotlin
-* Jetpack Compose
-* Android SDK
-* Minimum SDK: API 24
+Android AudioTrack
 
-### Audio
+16 kHz microphone processing
 
-* Android `AudioRecord`
-* 16 kHz
-* Mono
-* PCM 16-bit
+Mono PCM audio
 
-### Voice Activity Detection
+Audio buffer management
 
-* Silero VAD
-* Offline execution
-* sherpa-onnx / ONNX Runtime
+Voice Activity Detection
 
-### Speech-to-Text
-
-* Whisper Tiny
-* INT8 quantized ONNX model
-* sherpa-onnx / ONNX Runtime
-* CPU-oriented mobile inference
-
-### Text-to-Speech
-
-* Piper / VITS
-* Offline ONNX model
-* sherpa-onnx / ONNX Runtime
-* Android `AudioTrack` playback
-
-### Communication
-
-* Local Wi-Fi peer-to-peer transport
-* TCP sockets
-* Bluetooth planned through the same transport abstraction
-
-### Development
-
-* Android Studio
-* Git + GitHub
-* AI-assisted development through coding agents
-* Python/benchmarking tools for model evaluation
-
----
-
-## 📱 Current System
-
-The current working English pipeline is:
-
-```text
-🎙️ User Speech
-      ↓
 Silero VAD
-      ↓
-Whisper Tiny INT8
-      ↓
-📝 Text
-      ↓
-Wi-Fi TCP
-      ↓
-📝 Text
-      ↓
-Piper/VITS TTS
-      ↓
-🔊 Remote Speech
-```
 
-The two-phone workflow uses a push-to-talk interaction:
+Offline execution
 
-```text
-HOLD TO TALK
+ONNX-based inference
+
+Speech start/end detection
+
+Speech-to-Text
+
+English
+
+Whisper Tiny
+
+INT8 ONNX
+
+sherpa-onnx
+
+Indic Languages
+
+Vakyansh Wav2Vec2 CTC
+
+INT8 ONNX
+
+Generic ONNX Runtime Android
+
+The architecture supports both runtime types behind a common STT interface.
+
+Text-to-Speech
+
+Piper / VITS
+
+sherpa-onnx
+
+ONNX-based local inference
+
+Offline speech synthesis
+
+Android AudioTrack
+
+Communication
+
+Local Wi-Fi
+
+Network Service Discovery (NSD)
+
+TCP sockets
+
+Wi-Fi Direct / Android Wi-Fi P2P
+
+Bluetooth
+
+ACK-based delivery confirmation
+
+Connection state management
+
+Retry and reconnect mechanisms
+
+Development
+
+Android Studio
+
+Git
+
+GitHub
+
+Git LFS
+
+Python
+
+ONNX tooling
+
+Physical Android benchmark harness
+
+AI-assisted development tools
+
+📱 Current System
+
+The current production architecture supports:
+
+🎙️ Speech
+   ↓
+Silero VAD
+   ↓
+Language-specific STT
+   ↓
+📝 Text
+   ↓
+Wi-Fi / Wi-Fi Direct / Bluetooth
+   ↓
+📝 Text
+   ↓
+Language-specific TTS
+   ↓
+🔊 Speech
+
+The application also provides a Push-to-Talk interaction:
+
+HOLD TALK
+    ↓
+Speak
+    ↓
+Pause / Release
+    ↓
+STT
+    ↓
+Text
+    ↓
+Send
+    ↓
+Remote TTS
+    ↓
+Speaker
+
+🎙️ Push-to-Talk
+
+PTT is the primary walkie-talkie interaction.
+
+Flow
+
+PTT Press
+   ↓
+Microphone Capture
+   ↓
+VAD
+   ↓
+Speech Detection
+   ↓
+PTT Release / Pause
+   ↓
+Utterance Finalized
+   ↓
+STT
+   ↓
+Text Message
+   ↓
+Network
+
+The application does not transmit raw microphone audio during the normal text-transceiver path.
+
+🧠 Multilingual STT
+
+The initial experiment with a single multilingual Whisper Tiny model demonstrated that model size alone does not guarantee useful Indian-language recognition.
+
+The resulting architecture uses language-specific STT candidates.
+
+                     STT
+                      │
+              LanguageModelManager
+                      │
+          ┌───────────┴────────────┐
+          │                        │
+       English                    Indic
+          │                        │
+     sherpa-onnx             ONNX Runtime
+          │                        │
+      Whisper                Wav2Vec2 CTC
+
+Model Loading Strategy
+
+Only the currently selected language should be active.
+
+User selects Hindi
+        ↓
+Load Hindi STT
+        ↓
+Use Hindi
+        ↓
+User switches Tamil
+        ↓
+Release Hindi STT
+        ↓
+Load Tamil STT
+
+The application is therefore not intended to keep all 10 STT models resident in RAM simultaneously.
+
+🔊 Multilingual TTS
+
+TTS follows the same modular design.
+
+Received Text
+      ↓
+Language Metadata
+      ↓
+LanguageTtsManager
+      ↓
+Selected Voice
+      ↓
+Offline TTS
+      ↓
+AudioTrack
+      ↓
+Speaker
+
+Only the active TTS voice should remain loaded.
+
+🚨 Emergency Communication
+
+iTantra includes a dedicated emergency/alert communication subsystem.
+
+Emergency messages are separate from normal communication messages.
+
+Normal Message
+messageType = NORMAL
+priority    = NORMAL
+
+Emergency Message
+messageType = ALERT
+priority    = HIGH
+
+🚨 Emergency Alert Flow
+
+Emergency Mode
+      ↓
+Hold TALK
       ↓
 Speak
       ↓
-Release
+Pause / Release
       ↓
-STT
+Offline STT
       ↓
-Send text
+HIGH Priority ALERT
       ↓
-Remote TTS
+Wi-Fi / Wi-Fi Direct / Bluetooth
       ↓
-Speaker
-```
+Receiving Device
+      ↓
+High-Priority TTS
+      ↓
+🔊 Alert Playback
 
----
+Implemented emergency behavior includes:
 
-## ✅ Development Status
+High-priority alert messages
 
-| Phase                                       | Status         |
-| ------------------------------------------- | -------------- |
-| Phase 0 — Project & Git setup               | ✅ Complete     |
-| Phase 1 — Android foundation                | ✅ Complete     |
-| Phase 2 — Microphone + PCM + Silero VAD     | ✅ Complete     |
-| Phase 3 — Offline English STT               | ✅ Complete     |
-| Phase 4 — Offline English TTS               | ✅ Complete     |
-| Phase 5 — Wi-Fi text transport              | ✅ Complete     |
-| Phase 6 — Full voice transceiver            | ✅ Complete     |
-| Phase 6.1 — Latency & pause optimization    | 🔵 In Progress |
-| Phase 7 — Multilingual expansion            | ⏳ Planned      |
-| Phase 8 — Bluetooth + phone/emergency modes | ⏳ Planned      |
-| Phase 9 — Low-end/mid-range optimization    | ⏳ Planned      |
-| Phase 10 — Final benchmarking & SIH demo    | ⏳ Planned      |
+Explicit ACK-based delivery confirmation
 
----
+Alert queue
 
-## 📊 Current Development Benchmarks
+Duplicate message protection
 
-Current measurements are from the **development Samsung device** and are not yet representative of final low-end device performance.
+High-priority application audio playback
 
-| Component          | Current measurement |
-| ------------------ | ------------------: |
-| STT latency        |             ~491 ms |
-| Wi-Fi transport    |             ~126 ms |
-| TTS latency        |             ~246 ms |
-| End-to-end latency |         ~600–900 ms |
-| STT RTF            |          ~0.08–0.22 |
-| TTS RTF            |               ~0.15 |
-| English TTS model  |              ~63 MB |
-| STT model assets   |             ~104 MB |
+Normal speech interruption when necessary
 
-These values are tracked during development and will be re-measured on low-end and mid-range hardware during the optimization phase.
+Connection failure feedback
 
-**No performance claim is considered final until it is validated on target hardware.**
+Reconnect and retry
 
----
+🔔 Emergency Alert Reliability
 
-## ⚡ Performance Strategy
+A sender does not display:
+
+✓ Delivered
+
+simply because the packet was written to a socket.
+
+Instead:
+
+Sender
+   ↓
+Send ALERT
+   ↓
+Receiver
+   ↓
+Process ALERT
+   ↓
+Send ACK
+   ↓
+Sender
+   ↓
+✓ Delivered
+
+If the transport is unavailable:
+
+🚨 Alert not delivered
+Check connection
+
+is displayed.
+
+Duplicate alerts are identified using their message IDs.
+
+📡 Device Discovery
+
+iTantra supports automatic device discovery.
+
+Wi-Fi
+
+Network Service Discovery (NSD) is used to advertise and discover iTantra services.
+
+Wi-Fi Direct
+
+Android Wi-Fi P2P discovery is used to find nearby devices.
+
+Bluetooth
+
+Bluetooth discovery is used to identify nearby compatible devices.
+
+The UI attempts to use:
+
+Call Sign
+   ↓
+System Device Name
+   ↓
+Friendly Fallback
+
+instead of exposing raw addresses or internal identifiers.
+
+🔗 Connection State
+
+Connections are represented with explicit states:
+
+IDLE
+  ↓
+DISCOVERING
+  ↓
+PEER FOUND
+  ↓
+CONNECTING
+  ↓
+CONNECTED
+
+Failure:
+
+CONNECTING
+     ↓
+   FAILED
+
+The UI reflects the connection state:
+
+[ CONNECT ]
+
+       ↓
+
+[ CONNECTING... ]
+
+       ↓
+
+[ CONNECTED ✓ ]
+
+After successful connection, the user receives confirmation such as:
+
+✓ Connected to Station Alpha • Wi-Fi Direct
+
+🔄 P2P Reliability
+
+Wi-Fi Direct connection establishment can involve a delay between group formation and network readiness.
+
+The P2P transport therefore uses:
+
+Defensive channel initialization
+
+Runtime permission checks
+
+Peer discovery state handling
+
+Connection timeout
+
+Socket retry mechanism
+
+Lifecycle-safe cleanup
+
+Explicit connection state transitions
+
+The goal is to prevent stale or incomplete P2P states from appearing as successful connections.
+
+🧪 Multilingual STT Validation
+
+The project has benchmarked all 10 target languages on physical Android hardware.
+
+The model evaluation includes:
+
+WER
+
+CER
+
+Latency
+
+RTF
+
+Model size
+
+RAM
+
+Stability
+
+Native-script output
+
+Current physical-device results demonstrated stronger candidates for languages such as:
+
+Hindi
+Gujarati
+Telugu
+Kannada
+
+while several languages require further STT accuracy improvement.
+
+The project intentionally does not treat every language as production-ready simply because the model executes successfully.
+
+🔊 Multilingual TTS Validation
+
+Offline TTS voices have been benchmarked on a physical 6 GB Android device.
+
+Production-ready voices have been identified for several languages, including:
+
+Language
+
+Primary Voice
+
+RTF
+
+Status
+
+English
+
+Piper English
+
+~0.15
+
+✅ Baseline
+
+Hindi
+
+Piper Priyamvada
+
+0.171
+
+✅ Production Ready
+
+Telugu
+
+Piper Maya
+
+0.197
+
+✅ Production Ready
+
+Malayalam
+
+Piper Meera
+
+0.188
+
+✅ Production Ready
+
+Tamil
+
+Piper Rasa
+
+0.196
+
+✅ Production Ready
+
+Bengali
+
+Piper Google
+
+0.136
+
+✅ Production Ready
+
+Marathi
+
+Piper Google
+
+0.127
+
+✅ Production Ready
+
+Gujarati
+
+MMS baseline
+
+1.119
+
+🟡 Conditional
+
+Kannada
+
+MMS baseline
+
+1.072
+
+🟡 Conditional
+
+Odia
+
+Validation ongoing
+
+—
+
+🔄
+
+The preferred direction is lightweight Piper/VITS voices where they provide sufficient quality and mobile performance.
+
+📊 Current Development Benchmarks
+
+Benchmarks are collected from actual physical Android devices whenever possible.
+
+Representative TTS Results
+
+Hindi       → RTF 0.171
+Telugu      → RTF 0.197
+Malayalam   → RTF 0.188
+Tamil       → RTF 0.196
+Bengali     → RTF 0.136
+Marathi     → RTF 0.127
+
+Emergency Validation
+
+8 / 8 automated tests passed
+10 alert cycles
+~+3.27 MB PSS delta
+0 crashes
+0 ANRs
+0 SIGSEGV
+
+Important
+
+Benchmark values are device-specific engineering measurements.
+
+They are not universal guarantees for every Android device.
+
+⚡ Performance Strategy
 
 iTantra is designed around constrained-device execution.
 
-### Model loading
+Lazy Model Loading
 
-Only the active language model should be loaded into RAM.
+Only the active language model should be loaded.
 
-```text
 Device Storage
       ↓
 Selected Language
@@ -278,286 +818,923 @@ Selected Language
 Active STT/TTS Model
       ↓
 RAM
-```
 
-### CPU efficiency
+Inactive models should be released before switching languages.
 
-The system avoids requiring:
+CPU-Oriented Inference
 
-* Dedicated GPU
-* NPU
-* Vendor-specific acceleration
-* Cloud inference
+The architecture does not depend on:
 
-### Audio processing
+Dedicated GPUs
 
-* VAD prevents unnecessary STT processing during silence
-* PCM buffers are reused where practical
-* Processing runs off the Compose UI thread
-* Audio segments are processed incrementally
+Vendor-specific NPUs
 
-### Communication efficiency
+Cloud inference
 
-Only text packets are sent over the network.
+Remote speech APIs
 
----
+VAD Optimization
 
-## 🔐 Offline-First Design
+VAD prevents unnecessary STT processing during silence.
 
-The AI pipeline is intended to work without internet access.
+Audio Processing
 
-There are no runtime dependencies on:
+Audio capture and inference are kept away from the main UI thread where possible.
 
-* Cloud STT
-* Cloud TTS
-* Hosted LLM APIs
-* Remote inference services
+Text-Based Networking
 
-The core communication and AI pipeline operate locally.
+Only compact text and metadata are transmitted in the core communication path.
 
----
+📱 Hardware Strategy
 
-## 📁 Project Structure
+The application is being validated across multiple Android hardware classes.
 
-```text
+Development / Reference Device
+
+Samsung Galaxy S24
+
+Used for:
+
+development
+
+STT validation
+
+language switching
+
+connectivity testing
+
+production integration testing
+
+Mid-Range Validation Device
+
+Xiaomi Redmi Note 9 Pro
+
+Representative configuration:
+
+Snapdragon 720G
+~6 GB RAM
+Android 12
+
+Used for:
+
+Emergency Mode validation
+
+multilingual TTS validation
+
+resource profiling
+
+latency testing
+
+Low-End Validation
+
+A representative 4 GB RAM Android device remains required for final physical validation.
+
+The project does not claim complete 4 GB compatibility until that testing is performed.
+
+💾 Memory Strategy
+
+The application is explicitly designed to avoid loading every language model into memory simultaneously.
+
+Bad design:
+
+10 STT models
++
+10 TTS models
++
+VAD
+
+Preferred design:
+
+VAD
++
+ONE active STT model
++
+ONE active TTS voice
++
+Application Runtime
+
+When the user changes language:
+
+Old STT
+   ↓
+Release
+
+Old TTS
+   ↓
+Release
+
+New STT
+   ↓
+Load
+
+New TTS
+   ↓
+Load
+
+This architecture is intended to make the system practical for low- and mid-range Android hardware.
+
+🔐 Offline-First Design
+
+The core AI pipeline does not require internet access.
+
+The application does not require:
+
+Cloud STT
+
+Cloud TTS
+
+Hosted LLM APIs
+
+Remote speech recognition
+
+Remote speech synthesis
+
+The intended processing path is:
+
+Microphone
+   ↓
+Local VAD
+   ↓
+Local STT
+   ↓
+Local Text Processing
+   ↓
+Local Transport
+   ↓
+Local TTS
+   ↓
+Speaker
+
+🔒 Privacy
+
+The normal communication path does not transmit raw microphone audio.
+
+Instead:
+
+Raw Speech
+   ↓
+Local STT
+   ↓
+Text
+   ↓
+Network
+
+Diagnostic logging is designed to avoid unnecessary recording of personal speech or sensitive content.
+
+🧪 Testing Strategy
+
+Each subsystem is tested independently before full integration.
+
+Audio
+
+Microphone
+     ↓
+PCM
+     ↓
+VAD
+
+STT
+
+Speech
+   ↓
+STT
+   ↓
+Text
+
+TTS
+
+Text
+ ↓
+TTS
+ ↓
+Speech
+
+Transport
+
+Text
+ ↓
+Wi-Fi / Wi-Fi Direct / Bluetooth
+ ↓
+Text
+
+Emergency
+
+Alert
+ ↓
+Priority Queue
+ ↓
+Transport
+ ↓
+ACK
+ ↓
+High Priority TTS
+
+End-to-End
+
+Speech
+ ↓
+STT
+ ↓
+Transport
+ ↓
+TTS
+ ↓
+Speech
+
+🧪 Physical Device Validation
+
+The project uses automated Android instrumentation where possible.
+
+Tests include:
+
+STT model loading
+
+Repeated STT inference
+
+Repeated TTS synthesis
+
+Language switching
+
+Emergency alerts
+
+Connection failures
+
+Reconnection
+
+Memory stability
+
+Transport reliability
+
+PTT behavior
+
+The goal is to measure real device behavior rather than relying only on desktop benchmarks.
+
+📊 Performance Measurement
+
+The end-to-end chain is divided into measurable stages:
+
+Speech End
+     ↓
+STT Complete
+     ↓
+Packet Send
+     ↓
+Packet Receive
+     ↓
+TTS Start
+     ↓
+Audio Playback
+
+Measured boundaries include:
+
+STT Latency
+Transport Latency
+TTS Latency
+End-to-End Latency
+
+This allows individual bottlenecks to be identified and optimized independently.
+
+📦 Message Architecture
+
+Each message can contain metadata such as:
+
+sessionId
+messageId
+sequenceNumber
+timestamp
+language
+messageType
+priority
+text
+checksum
+
+Control messages such as:
+
+ACK
+PING
+
+are separated from normal user messages.
+
+🏗️ Production Multilingual Architecture
+
+The production STT architecture uses a common interface:
+
+                 SttEngine
+                    │
+        ┌───────────┴────────────┐
+        │                        │
+SherpaOnnxSttEngine      GenericOnnxCtcSttEngine
+        │                        │
+     Whisper                Wav2Vec2 CTC
+
+The communication layer does not need to know which engine is active.
+
+Similarly, TTS is designed around:
+
+LanguageTtsManager
+        ↓
+Language
+        ↓
+Active Voice
+        ↓
+TTS Engine
+
+This allows individual language models to be replaced without rewriting the transceiver.
+
+📁 Project Structure
+
 iTantra/
 │
 ├── app/
 │   └── src/
-│       └── main/
-│           ├── java/
-│           │   └── com/itantra/app/
-│           │       ├── audio/
-│           │       ├── ui/
-│           │       └── ...
-│           ├── assets/
-│           │   ├── STT models
-│           │   ├── TTS models
-│           │   └── VAD model
-│           └── AndroidManifest.xml
+│       ├── main/
+│       │   ├── java/
+│       │   │   └── com/itantra/app/
+│       │   │       ├── audio/
+│       │   │       ├── comm/
+│       │   │       └── ui/
+│       │   │
+│       │   ├── assets/
+│       │   │   ├── STT models
+│       │   │   ├── TTS models
+│       │   │   └── VAD model
+│       │   │
+│       │   └── jniLibs/
+│       │
+│       └── androidTest/
+│
+├── benchmarks/
+│   ├── multilingual_stt/
+│   ├── indic_stt/
+│   ├── tts/
+│   └── device_compatibility/
 │
 ├── docs/
-│   ├── PROJECT_CONTEXT.md
-│   ├── PHASE_STATUS.md
 │   ├── ARCHITECTURE.md
+│   ├── MULTILINGUAL_STT_ARCHITECTURE.md
+│   ├── TTS_ARCHITECTURE.md
+│   ├── DEVICE_COMPATIBILITY.md
+│   ├── EMERGENCY_ALERT_SPEC.md
+│   ├── CONNECTIVITY_UI_BEHAVIOR.md
+│   ├── BENCHMARKS.md
 │   ├── DECISIONS.md
-│   └── BENCHMARKS.md
+│   ├── PHASE_STATUS.md
+│   └── THIRD_PARTY_LICENSES.md
 │
 ├── gradle/
 ├── build.gradle.kts
 ├── settings.gradle.kts
 ├── gradlew
+├── .gitattributes
 └── README.md
-```
 
-The `docs/` directory acts as the project's persistent technical memory and records architecture, decisions, phase progress and measured benchmarks.
+✅ Development Status
 
----
+Phase
 
-## 🧪 Testing Strategy
+Status
 
-Each subsystem is tested independently before being connected to the complete pipeline.
+Phase 0 — Project & Git setup
 
-### Audio
+✅ Complete
 
-```text
-Microphone
-→ PCM
-→ VAD
-```
+Phase 1 — Android foundation
 
-### STT
+✅ Complete
 
-```text
-Speech
-→ Whisper
-→ Text
-```
+Phase 2 — Microphone + PCM + Silero VAD
 
-### TTS
+✅ Complete
 
-```text
+Phase 3 — Offline English STT
+
+✅ Complete
+
+Phase 4 — Offline English TTS
+
+✅ Complete
+
+Phase 5 — Wi-Fi text transport
+
+✅ Complete
+
+Phase 6 — Full voice transceiver
+
+✅ Complete
+
+Phase 6.x — PTT / pause / latency fixes
+
+✅ Complete
+
+Phase 7 — Multilingual STT research & validation
+
+✅ Complete
+
+Phase 7.x — Multilingual STT architecture
+
+✅ Complete
+
+Phase 7.9 — Initial production multilingual STT integration
+
+✅ Complete
+
+Phase 8 — Emergency / Alert communication
+
+✅ Complete
+
+Phase 8.x — P2P stability & connection UX
+
+✅ Complete
+
+Phase 8.5 — Hindi/Gujarati TTS validation
+
+✅ Complete
+
+Phase 8.6 — Telugu/Kannada TTS validation
+
+✅ Complete
+
+Phase 8.7 — Malayalam/Tamil TTS validation
+
+✅ Complete
+
+Phase 8.8 — Bengali/Marathi TTS validation
+
+✅ Complete
+
+Phase 8.9 — Odia TTS validation
+
+🔄 Next
+
+Final multilingual TTS integration
+
+⏳
+
+4 GB hardware validation
+
+⏳
+
+Full multilingual end-to-end testing
+
+⏳
+
+PTT-off phone mode
+
+⏳
+
+Final SIH hardening
+
+⏳
+
+🛣️ Roadmap
+
+Phase 8.9 — Odia TTS
+
+Final TTS language validation:
+
+Odia TTS candidate search
+
+Desktop screening
+
+Physical Android validation
+
+Latency
+
+RTF
+
+RAM
+
+Intelligibility
+
+Stability
+
+Phase 9 — Multilingual STT + TTS Integration
+
+After the TTS model audit is complete:
+
+User selects language
+       ↓
+LanguageModelManager
+       ↓
+Active STT
+       +
+LanguageTtsManager
+       ↓
+Active TTS
+
+The user should only need to select the communication language.
+
+Example:
+
+Language: ಕನ್ನಡ
+
+should automatically select the corresponding STT and TTS pipeline.
+
+Phase 9.1 — Full End-to-End Multilingual Communication
+
+The final communication loop should work as:
+
+PHONE A
+
+🎙️ Speak
+   ↓
+VAD
+   ↓
+STT
+   ↓
 Text
-→ Piper/VITS
-→ Speech
-```
+   ↓
+Wi-Fi / Bluetooth
+   ↓
 
-### Transport
+PHONE B
 
-```text
 Text
-→ Wi-Fi
-→ Text
-```
+   ↓
+TTS
+   ↓
+🔊 Speech
 
-### End-to-end
+The same flow should work across the validated language set.
 
-```text
+Phase 9.2 — PTT Walkie-Talkie Validation
+
+Two phones should behave as:
+
+PHONE A
+PTT
+ ↓
 Speech
-→ STT
-→ Transport
-→ TTS
-→ Speech
-```
+ ↓
+STT
+ ↓
+Text
+ ↓
+Transport
+ ↓
+TTS
+ ↓
+PHONE B
 
-This modular testing approach makes it easier to identify performance and reliability bottlenecks.
+The system should support repeated communication without requiring application restart.
 
----
+Phase 9.3 — Phone Mode
 
-## 🛣️ Roadmap
+The problem statement also specifies phone-like operation when PTT is disabled.
 
-### Phase 6.1 — Latency & Pause Optimization
+The future flow is:
 
-Current focus:
+PTT ON
+   ↓
+Walkie-Talkie Mode
 
-* Reduce VAD endpoint delay
-* Improve pause recognition
-* Reduce unnecessary STT preparation
-* Reuse STT recognizer/model
-* Reduce TTS startup overhead
-* Measure component-level latency
+PTT OFF
+   ↓
+Phone / Continuous Conversation Mode
 
-Current baseline:
+This remains part of the remaining implementation.
 
-```text
-STT      ≈ 491 ms
-Network  ≈ 126 ms
-TTS      ≈ 246 ms
-```
+Phase 9.4 — Low-End Hardware Validation
 
-### Phase 7 — Multilingual Support
+Final validation should include:
 
-Expand the architecture to:
+Samsung Galaxy S24
+        ↓
+Reference
 
-* Hindi
-* Gujarati
-* Marathi
-* Kannada
-* Malayalam
-* Tamil
-* Telugu
-* Odia
-* Bengali
-* English
+6 GB Mid-Range Device
+        ↓
+Validation
 
-Before integration, each model will be evaluated for:
+4 GB Low-End Device
+        ↓
+Validation
 
-* Model size
-* RAM
-* CPU usage
-* Latency
-* RTF
-* Accuracy
-* Android compatibility
-* Offline support
+The following should be measured:
 
-### Phase 8 — Remaining Communication Modes
+RAM
 
-Planned:
+CPU
 
-* Bluetooth transport
-* Phone-like continuous mode
-* Emergency/alert mode
-* High-priority voice announcements
-* Improved peer discovery
+STT latency
 
-### Phase 9 — Low-End & Mid-Range Optimization
+TTS latency
 
-Final validation on target constrained devices:
+RTF
 
-* RAM
-* CPU
-* Battery/resource usage
-* Model footprint
-* STT WER
-* TTS quality
-* RTF
-* End-to-end latency
-* Idle CPU usage
+Model footprint
 
-### Phase 10 — SIH Validation
+End-to-end latency
 
-Final system evaluation:
+Battery/resource behavior
 
-* 10-language accuracy
-* Model/app footprint
-* CPU/RAM efficiency
-* STT/TTS latency
-* End-to-end voice latency
-* Offline operation
-* Two-phone communication
-* Walkie-talkie demonstration
+Stability
 
----
+Language switching
 
-## 🚀 Demo Concept
+Phase 10 — Final SIH Hardening
 
-The final demonstration is designed around two Android devices:
+Final testing will include:
 
-```text
-             PHONE A
-                │
-          🎙️ Speak Kannada
-                │
-                ▼
-             Offline
-               STT
-                │
-                ▼
-              Text
-                │
-          Local Wi-Fi/BT
-                │
-                ▼
-              Text
-                │
-             Offline
-               TTS
-                │
-                ▼
-             🔊 Speech
-             PHONE B
-```
+Clean installation
 
-The goal is to demonstrate that meaningful voice communication can occur **without transmitting audio and without relying on internet-hosted speech APIs**.
+Offline operation
 
----
+Two-phone communication
 
-## ⚠️ Current Limitations
+PTT reliability
 
-The current prototype has several known limitations:
+Emergency alerts
 
-* English is currently the validated AI language.
-* Wi-Fi is currently the validated transport.
-* Bluetooth integration is still pending.
-* Peer communication is currently 1-to-1.
-* Client connection currently uses manual IP configuration.
-* Low-end hardware validation is not yet complete.
-* Multilingual model integration is still pending.
-* Final production-grade security hardening is still pending.
+Wi-Fi
 
-These are tracked as future development phases rather than hidden limitations.
+Wi-Fi Direct
 
----
+Bluetooth
 
-## 🤝 Development Philosophy
+Language switching
 
-iTantra is built incrementally.
+STT/TTS stability
 
-Each major subsystem is:
+Low-end hardware
 
-1. Implemented
-2. Tested independently
-3. Benchmarked
-4. Optimized
-5. Integrated into the next phase
+Mid-range hardware
 
-The project prioritizes **practical mobile performance over unnecessarily large models**, especially because the target environment includes low-end and mid-range devices.
+Long-duration stress testing
 
----
+Final documentation
 
-## 📜 License
+Backup APK
 
-This project is being developed for **Smart India Hackathon 2026**.
+Reproducible judge demonstration
 
-Individual dependencies and AI models remain subject to their respective open-source licenses. Refer to each dependency/model's license before redistribution.
+🚀 Demo Concept
+
+The primary demonstration uses two Android phones.
+
+                 PHONE A
+                    │
+                    ▼
+              🎙️ Speak
+                    │
+                    ▼
+               Silero VAD
+                    │
+                    ▼
+                Offline STT
+                    │
+                    ▼
+                  Text
+                    │
+             Wi-Fi / Bluetooth
+                    │
+                    ▼
+                  Text
+                    │
+                    ▼
+               Offline TTS
+                    │
+                    ▼
+               🔊 Speech
+                    │
+                 PHONE B
+
+🚨 Emergency Demo
+
+PHONE A
+   ↓
+Emergency Mode
+   ↓
+Hold TALK
+   ↓
+Speak
+   ↓
+Offline STT
+   ↓
+HIGH Priority Alert
+   ↓
+Wi-Fi / Bluetooth
+   ↓
+PHONE B
+   ↓
+Emergency Playback
+   ↓
+🔊 ALERT
+
+The receiving phone prioritizes the emergency message over normal application speech.
+
+📡 Communication Demo
+
+The communication layer is designed around multiple local transports:
+
+             iTantra Transport
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+       Wi-Fi    Wi-Fi Direct  Bluetooth
+        │           │           │
+        └───────────┼───────────┘
+                    │
+                Text Packet
+
+The application uses a shared transport abstraction so that speech-processing logic remains independent from the communication technology.
+
+⚠️ Current Limitations
+
+iTantra is still under active development.
+
+Current limitations include:
+
+STT accuracy is not equal across all 10 target languages.
+
+Several Indic STT models require further accuracy improvement.
+
+Gujarati TTS currently has a slower validated baseline and needs a faster production voice.
+
+Kannada TTS currently has a slower validated baseline and needs a faster production voice.
+
+Odia TTS validation remains.
+
+Full production integration of all 10 TTS languages is not yet complete.
+
+A representative physical 4 GB Android device is still required for final hardware validation.
+
+PTT-off phone-style continuous communication remains under development.
+
+Final full-system stress testing remains.
+
+These limitations are tracked explicitly instead of being hidden.
+
+🔐 Open-Source Strategy
+
+iTantra uses open-source software, frameworks and model technologies wherever possible.
+
+Current technologies include:
+
+sherpa-onnx
+
+ONNX Runtime
+
+Whisper
+
+Vakyansh
+
+Piper / VITS
+
+Silero VAD
+
+Android platform APIs
+
+License information for individual third-party components and models is maintained in:
+
+docs/THIRD_PARTY_LICENSES.md
+
+Every new model or voice must be independently checked for:
+
+License
+
+Attribution requirements
+
+Redistribution rights
+
+Commercial-use conditions
+
+🧭 Design Philosophy
+
+iTantra follows a vertical-slice development strategy.
+
+Each subsystem is:
+
+Implemented
+   ↓
+Tested
+   ↓
+Benchmarked
+   ↓
+Optimized
+   ↓
+Integrated
+
+The project prioritizes:
+
+Offline First
+
+Core inference does not rely on cloud services.
+
+Text Over Audio
+
+The communication channel carries recognized text instead of raw speech.
+
+Device Awareness
+
+Models are selected based on actual mobile measurements.
+
+Modular AI
+
+Language-specific models can be replaced independently.
+
+Single Active Model
+
+Inactive language models are released from memory.
+
+Measurable Performance
+
+Latency and resource usage are measured on physical hardware.
+
+Recoverable Networking
+
+Connection failures, acknowledgements, retries and reconnect states are explicitly handled.
+
+📊 What Makes iTantra Different?
+
+Traditional voice communication:
+
+Voice
+ ↓
+Audio Encoding
+ ↓
+Network
+ ↓
+Audio Decoding
+ ↓
+Voice
+
+iTantra:
+
+Voice
+ ↓
+Local AI
+ ↓
+Text
+ ↓
+Low-Bitrate Link
+ ↓
+Text
+ ↓
+Local AI
+ ↓
+Voice
+
+The communication link therefore does not need to carry the original voice waveform.
+
+🏁 Final Vision
+
+iTantra aims to provide a practical multilingual communication system for constrained environments by moving speech intelligence to the edge.
+
+                 HUMAN
+                   │
+                   ▼
+              🎙️ SPEECH
+                   │
+                   ▼
+               LOCAL AI
+                   │
+                   ▼
+              📝 TEXT
+                   │
+                   ▼
+          LOW-BANDWIDTH LINK
+                   │
+                   ▼
+              📝 TEXT
+                   │
+                   ▼
+               LOCAL AI
+                   │
+                   ▼
+              🔊 SPEECH
+                   │
+                   ▼
+                 HUMAN
+
+The final goal is:
+
+Understand speech locally, communicate efficiently, and reconstruct speech locally.
+
+🇮🇳 iTantra
+
+Indian Multilingual TTS & STT Aided Neural Transceiver for Low-Bitrate Links
+
+SIH 2026 — Problem Statement 26173
+
+Offline AI • Multilingual Speech • Low-Bandwidth Communication • Emergency Communication • Android Edge Inference
+
+Current Status
+
+Core Offline Transceiver        ✅
+Silero VAD                      ✅
+English STT                     ✅
+English TTS                     ✅
+Wi-Fi                           ✅
+Wi-Fi Direct                    ✅
+Bluetooth                       ✅
+Automatic Discovery             ✅
+PTT Walkie-Talkie               ✅
+Emergency Alerts                ✅
+Multilingual STT Validation     ✅
+Initial Multilingual STT        ✅
+Multilingual TTS Validation     🔄
+4 GB Hardware Validation        ⏳
+Full 10-Language Integration    ⏳
+Phone Mode                      ⏳
+Final SIH Hardening             ⏳
