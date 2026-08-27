@@ -1,0 +1,6 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+mms_ory,VITS (Meta MMS),FP32/ONNX,16000,1237,emergency_1,"ଜରୁରୀ ସତର୍କତା, ଚାରି ନମ୍ବର ସେକ୍ଟରରେ ତୁରନ୍ତ ସାହାଯ୍ୟ ଆବଶ୍ୟକ।",4557,4.43,1.028,375.87,5.36,Intelligible emergency directive; clear Odia syllables
+mms_ory,VITS (Meta MMS),FP32/ONNX,16000,1237,emergency_2,"ରେଡ୍ ଆଲର୍ଟ, ସମସ୍ତ ଦଳ ସଦସ୍ୟ ତୁରନ୍ତ ସୁରକ୍ଷିତ ସ୍ଥାନକୁ ଯାଆନ୍ତୁ।",5137,4.79,1.072,386.74,5.36,Command cadence audible; monotone character synthesis
+mms_ory,VITS (Meta MMS),FP32/ONNX,16000,1237,location,"ଆମେ ଷ୍ଟେସନ ଆଲଫାରେ ଅଛୁ, ମୁଖ୍ୟ ଫାଟକରୁ ପଚାଶ ମିଟର ଉତ୍ତରକୁ।",4223,4.03,1.048,391.87,5.36,Accurate spatial directions ('ପଚାଶ ମିଟର ଉତ୍ତରକୁ')
+mms_ory,VITS (Meta MMS),FP32/ONNX,16000,1237,numbers,"ଦଳରେ ମୋଟ ବାର ଜଣ ସଦସ୍ୟ ଅଛନ୍ତି, ବ୍ୟାଟେରୀ ସ୍ତର ପଞ୍ଚସ୍ତରୀ ପ୍ରତିଶତ।",4744,4.60,1.032,392.35,5.36,Odia numerals and percentages intelligible ('ବାର ଜଣ', 'ପଞ୍ଚସ୍ତରୀ ପ୍ରତିଶତ')
+mms_ory,VITS (Meta MMS),FP32/ONNX,16000,1237,short,"ରେଡିଓ ଯାଞ୍ଚ, ମୋର ସ୍ୱର ଆପଣଙ୍କୁ ସ୍ପଷ୍ଟ ଶୁଣାଯାଉଛି କି?",3703,3.79,0.978,392.83,5.36,Faster than real-time on short query (RTF 0.978); zero leak (+5.36MB)

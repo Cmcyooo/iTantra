@@ -1,10 +1,12 @@
 package com.itantra.app.comm
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
@@ -16,23 +18,42 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import android.Manifest
-import android.content.pm.PackageManager
+
+/**
+ * Explicit 9-state P2P lifecycle state machine.
+ */
+enum class P2PState {
+    IDLE,
+    DISCOVERING,
+    PEER_FOUND,
+    CONNECTING,
+    GROUP_FORMING,
+    SOCKET_CONNECTING,
+    CONNECTED,
+    FAILED,
+    DISCONNECTED
+}
 
 /**
  * Manages Wi-Fi Direct (P2P) discovery and connection.
- * Uses Service Discovery to identify iTantra peers.
+ * Guarantees crash-free lifecycle, channel auto-recovery, defensive permission handling,
+ * and an explicit 9-state state machine.
  */
 class WiFiDirectManager(private val context: Context) {
-    private val manager: WifiP2pManager? = context.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
-    private val channel: WifiP2pManager.Channel? = manager?.let {
-        try {
-            it.initialize(context, context.mainLooper, null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize Wi-Fi Direct channel", e)
-            null
-        }
+
+    companion object {
+        private const val TAG = "WiFiDirectManager"
     }
+
+    private val appContext = context.applicationContext
+    private val manager: WifiP2pManager? = appContext.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
+    private var channel: WifiP2pManager.Channel? = null
+
+    private val _p2pState = MutableStateFlow(P2PState.IDLE)
+    val p2pState: StateFlow<P2PState> = _p2pState.asStateFlow()
+
+    private val _statusMessage = MutableStateFlow("Ready")
+    val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
     private val _peers = MutableStateFlow<List<WifiP2pDevice>>(emptyList())
     val peers: StateFlow<List<WifiP2pDevice>> = _peers.asStateFlow()
@@ -43,56 +64,97 @@ class WiFiDirectManager(private val context: Context) {
     private val _isDiscoveryActive = MutableStateFlow(false)
     val isDiscoveryActive: StateFlow<Boolean> = _isDiscoveryActive.asStateFlow()
 
-    private val _isAvailable = MutableStateFlow(manager != null && channel != null)
+    private val _isAvailable = MutableStateFlow(false)
     val isAvailable: StateFlow<Boolean> = _isAvailable.asStateFlow()
+
+    private var isReceiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
-        override fun onReceive(context: Context, intent: Intent) {
+        override fun onReceive(recvContext: Context, intent: Intent) {
+            val action = intent.action ?: return
+            Log.d(TAG, "[P2P-DIAG] Broadcast received: $action")
+
             if (!hasRequiredPermissions()) {
-                Log.w(TAG, "Missing permissions in BroadcastReceiver")
+                Log.w(TAG, "[P2P-DIAG] Permission state: Missing required permissions in receiver")
+                _statusMessage.value = "Nearby devices permission required"
                 return
             }
 
-            when (intent.action) {
+            when (action) {
                 WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
                     val state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
                     val isEnabled = state == WifiP2pManager.WIFI_P2P_STATE_ENABLED
-                    Log.d(TAG, "P2P State changed: ${if (isEnabled) "ENABLED" else "DISABLED"}")
+                    Log.i(TAG, "[P2P-DIAG] Wi-Fi P2P state transition: ${if (isEnabled) "ENABLED" else "DISABLED"}")
+                    _isAvailable.value = isEnabled && manager != null && channel != null
                     if (!isEnabled) {
                         _peers.value = emptyList()
+                        _statusMessage.value = "Wi-Fi Direct unavailable"
+                        transitionTo(P2PState.DISCONNECTED)
                     }
                 }
+
                 WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                    Log.d(TAG, "Peers changed action received")
-                    if (manager != null && channel != null) {
-                        manager.requestPeers(channel) { peerList ->
-                            // Filter for iTantra devices by name
-                            val filteredPeers = peerList.deviceList.filter { 
-                                it.deviceName.contains("iTantra", ignoreCase = true) || 
-                                it.deviceName.contains("Android", ignoreCase = true) ||
-                                it.deviceName.contains("Direct", ignoreCase = true) // Fallback for debugging
+                    Log.d(TAG, "[P2P-DIAG] Peers changed broadcast received")
+                    val currentChannel = channel
+                    if (manager != null && currentChannel != null) {
+                        try {
+                            manager.requestPeers(currentChannel) { peerList ->
+                                val list = peerList?.deviceList?.toList() ?: emptyList()
+                                Log.i(TAG, "[P2P-DIAG] Peer discovered count: ${list.size}")
+                                list.forEach { dev ->
+                                    Log.d(TAG, "  -> Found peer: ${dev.deviceName} (${dev.deviceAddress}) status=${dev.status}")
+                                }
+                                _peers.value = list
+                                if (list.isNotEmpty()) {
+                                    if (_p2pState.value == P2PState.DISCOVERING || _p2pState.value == P2PState.IDLE) {
+                                        transitionTo(P2PState.PEER_FOUND)
+                                    }
+                                }
                             }
-                            Log.d(TAG, "Discovered ${filteredPeers.size} potential peers")
-                            _peers.value = filteredPeers
+                        } catch (e: Exception) {
+                            Log.e(TAG, "[P2P-DIAG] Exception calling requestPeers", e)
                         }
                     }
                 }
+
                 WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                     @Suppress("DEPRECATION")
-                    val networkInfo = intent.getParcelableExtra<NetworkInfo>(WifiP2pManager.EXTRA_NETWORK_INFO)
-                    Log.d(TAG, "Connection changed: isConnected=${networkInfo?.isConnected}")
-                    if (networkInfo?.isConnected == true) {
-                        if (manager != null && channel != null) {
-                            manager.requestConnectionInfo(channel) { info ->
-                                Log.i(TAG, "Connection info available: GroupFormed=${info.groupFormed}, IsGroupOwner=${info.isGroupOwner}, OwnerAddr=${info.groupOwnerAddress?.hostAddress}")
-                                _connectionInfo.value = info
+                    val networkInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO, NetworkInfo::class.java)
+                    } else {
+                        intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO)
+                    }
+                    val isConnected = networkInfo?.isConnected == true
+                    Log.i(TAG, "[P2P-DIAG] Connection changed broadcast: isConnected=$isConnected")
+
+                    if (isConnected) {
+                        transitionTo(P2PState.GROUP_FORMING)
+                        val currentChannel = channel
+                        if (manager != null && currentChannel != null) {
+                            try {
+                                manager.requestConnectionInfo(currentChannel) { info ->
+                                    if (info != null) {
+                                        Log.i(TAG, "[P2P-DIAG] Group formed info: groupFormed=${info.groupFormed}, isGroupOwner=${info.isGroupOwner}, ownerAddr=${info.groupOwnerAddress?.hostAddress}")
+                                        _connectionInfo.value = info
+                                        if (info.groupFormed) {
+                                            transitionTo(P2PState.SOCKET_CONNECTING)
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "[P2P-DIAG] Exception calling requestConnectionInfo", e)
                             }
                         }
                     } else {
+                        Log.i(TAG, "[P2P-DIAG] Disconnected event received")
                         _connectionInfo.value = null
+                        if (_p2pState.value != P2PState.IDLE && _p2pState.value != P2PState.DISCOVERING) {
+                            transitionTo(P2PState.DISCONNECTED)
+                        }
                     }
                 }
+
                 WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
                     val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE, WifiP2pDevice::class.java)
@@ -100,137 +162,281 @@ class WiFiDirectManager(private val context: Context) {
                         @Suppress("DEPRECATION")
                         intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE)
                     }
-                    Log.d(TAG, "This device changed: ${device?.deviceName} status=${device?.status}")
+                    Log.d(TAG, "[P2P-DIAG] Local device status changed: ${device?.deviceName} status=${device?.status}")
                 }
             }
         }
     }
 
     init {
-        Log.i(TAG, "Initializing WiFiDirectManager. Available: ${manager != null && channel != null}")
-        
+        Log.i(TAG, "[P2P-DIAG] Initializing WiFiDirectManager...")
+        initChannel()
+        registerReceiverSafe()
+    }
+
+    private fun initChannel() {
+        if (manager == null) {
+            Log.w(TAG, "[P2P-DIAG] WifiP2pManager is null. Device does not support Wi-Fi Direct.")
+            _isAvailable.value = false
+            _statusMessage.value = "Wi-Fi Direct unavailable"
+            return
+        }
+
+        try {
+            channel = manager.initialize(appContext, appContext.mainLooper) {
+                Log.w(TAG, "[P2P-DIAG] Wi-Fi Direct Channel disconnected by framework! Attempting recovery...")
+                channel = null
+                _isAvailable.value = false
+                // Attempt recovery after a short delay
+                initChannel()
+            }
+            _isAvailable.value = (channel != null)
+            Log.i(TAG, "[P2P-DIAG] Wi-Fi Direct channel initialized successfully: ${channel != null}")
+        } catch (e: Exception) {
+            Log.e(TAG, "[P2P-DIAG] Failed to initialize Wi-Fi Direct channel", e)
+            channel = null
+            _isAvailable.value = false
+            _statusMessage.value = "Wi-Fi Direct unavailable"
+        }
+    }
+
+    private fun registerReceiverSafe() {
+        if (isReceiverRegistered) return
         val intentFilter = IntentFilter().apply {
             addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
         }
-        
-        // Use proper registration for system broadcasts
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, intentFilter)
-        }
-        
-        setupServiceDiscovery()
-    }
 
-    private fun hasRequiredPermissions(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    private fun setupServiceDiscovery() {
-        if (manager == null || channel == null) return
-        
         try {
-            manager.setServiceResponseListener(channel, object : WifiP2pManager.ServiceResponseListener {
-                override fun onServiceAvailable(protocolType: Int, responseData: ByteArray?, srcDevice: WifiP2pDevice?) {
-                    Log.d(TAG, "Service found via general listener from ${srcDevice?.deviceName}")
-                }
-            })
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(receiver, intentFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                appContext.registerReceiver(receiver, intentFilter)
+            }
+            isReceiverRegistered = true
+            Log.d(TAG, "[P2P-DIAG] BroadcastReceiver registered successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to set service response listener", e)
+            Log.e(TAG, "[P2P-DIAG] Failed to register BroadcastReceiver", e)
         }
+    }
+
+    private fun unregisterReceiverSafe() {
+        if (!isReceiverRegistered) return
+        try {
+            appContext.unregisterReceiver(receiver)
+            isReceiverRegistered = false
+            Log.d(TAG, "[P2P-DIAG] BroadcastReceiver unregistered successfully")
+        } catch (e: Exception) {
+            Log.w(TAG, "[P2P-DIAG] Error unregistering BroadcastReceiver: ${e.message}")
+        }
+    }
+
+    fun hasRequiredPermissions(): Boolean {
+        val hasPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
+        Log.d(TAG, "[P2P-DIAG] Permission state: $hasPerm")
+        return hasPerm
     }
 
     @SuppressLint("MissingPermission")
     fun startDiscovery() {
-        if (manager == null || channel == null) {
-            Log.e(TAG, "Cannot start discovery: P2P manager or channel is null")
+        Log.i(TAG, "[P2P-DIAG] Discovery start requested...")
+        if (!hasRequiredPermissions()) {
+            Log.w(TAG, "[P2P-DIAG] Cannot start discovery: Missing permissions")
+            _statusMessage.value = "Nearby devices permission required"
+            transitionTo(P2PState.FAILED)
             return
         }
 
-        if (!hasRequiredPermissions()) {
-            Log.e(TAG, "Cannot start discovery: Missing permissions")
-            return
+        if (manager == null || channel == null) {
+            Log.e(TAG, "[P2P-DIAG] Cannot start discovery: Manager or channel null")
+            initChannel()
+            if (channel == null) {
+                _statusMessage.value = "Wi-Fi Direct unavailable"
+                transitionTo(P2PState.FAILED)
+                return
+            }
         }
 
         _peers.value = emptyList()
         _isDiscoveryActive.value = true
+        transitionTo(P2PState.DISCOVERING)
+        _statusMessage.value = "Searching for nearby Wi-Fi Direct devices..."
 
-        Log.d(TAG, "Initiating peer discovery...")
-        manager.discoverPeers(channel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() {
-                Log.d(TAG, "Discovery initiation success")
-            }
-            override fun onFailure(reason: Int) {
-                val reasonStr = when(reason) {
-                    WifiP2pManager.P2P_UNSUPPORTED -> "P2P Unsupported"
-                    WifiP2pManager.ERROR -> "Internal Error"
-                    WifiP2pManager.BUSY -> "Busy"
-                    else -> "Unknown ($reason)"
+        val currentMgr = manager
+        val currentChannel = channel
+        if (currentMgr == null || currentChannel == null) {
+            _statusMessage.value = "Wi-Fi Direct unavailable"
+            transitionTo(P2PState.FAILED)
+            return
+        }
+
+        try {
+            currentMgr.discoverPeers(currentChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.i(TAG, "[P2P-DIAG] Discovery start: discoverPeers() SUCCESS")
                 }
-                Log.e(TAG, "Discovery initiation failed: $reasonStr")
-                _isDiscoveryActive.value = false
-            }
-        })
+
+                override fun onFailure(reason: Int) {
+                    val reasonStr = when (reason) {
+                        WifiP2pManager.P2P_UNSUPPORTED -> "P2P Unsupported"
+                        WifiP2pManager.ERROR -> "Internal Error"
+                        WifiP2pManager.BUSY -> "System Busy"
+                        else -> "Error Code $reason"
+                    }
+                    Log.e(TAG, "[P2P-DIAG] Discovery start: discoverPeers() FAILED: $reasonStr")
+                    _isDiscoveryActive.value = false
+                    _statusMessage.value = "Unable to start Wi-Fi Direct discovery ($reasonStr)"
+                    transitionTo(P2PState.FAILED)
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "[P2P-DIAG] Exception invoking discoverPeers()", e)
+            _isDiscoveryActive.value = false
+            _statusMessage.value = "Unable to start Wi-Fi Direct discovery"
+            transitionTo(P2PState.FAILED)
+        }
     }
 
     fun stopDiscovery() {
-        if (manager == null || channel == null) return
-        
-        Log.d(TAG, "Stopping peer discovery")
-        manager.stopPeerDiscovery(channel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() { Log.d(TAG, "Stop discovery success") }
-            override fun onFailure(reason: Int) { Log.e(TAG, "Stop discovery failed: $reason") }
-        })
+        Log.d(TAG, "[P2P-DIAG] Discovery stop requested")
+        val currentChannel = channel
+        if (manager != null && currentChannel != null) {
+            try {
+                manager.stopPeerDiscovery(currentChannel, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        Log.d(TAG, "[P2P-DIAG] stopPeerDiscovery() success")
+                    }
+                    override fun onFailure(reason: Int) {
+                        Log.d(TAG, "[P2P-DIAG] stopPeerDiscovery() failure: $reason")
+                    }
+                })
+            } catch (e: Exception) {
+                Log.w(TAG, "[P2P-DIAG] Exception stopping discovery: ${e.message}")
+            }
+        }
         _isDiscoveryActive.value = false
     }
 
     @SuppressLint("MissingPermission")
     fun connect(device: WifiP2pDevice) {
-        if (manager == null || channel == null) return
-        
-        Log.i(TAG, "Connecting to ${device.deviceName} (${device.deviceAddress})")
+        Log.i(TAG, "[P2P-DIAG] Connect request: target=${device.deviceName} (${device.deviceAddress})")
+        if (manager == null || channel == null) {
+            initChannel()
+            if (channel == null) {
+                _statusMessage.value = "Wi-Fi Direct unavailable"
+                transitionTo(P2PState.FAILED)
+                return
+            }
+        }
+
+        transitionTo(P2PState.CONNECTING)
+        _statusMessage.value = "Connecting to ${device.deviceName}..."
+
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
         }
-        
-        manager.connect(channel, config, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() { Log.d(TAG, "Connection request accepted for ${device.deviceName}") }
-            override fun onFailure(reason: Int) { Log.e(TAG, "Connection request failed: $reason") }
-        })
+
+        val currentMgr = manager
+        val currentChannel = channel
+        if (currentMgr == null || currentChannel == null) {
+            _statusMessage.value = "Wi-Fi Direct unavailable"
+            transitionTo(P2PState.FAILED)
+            return
+        }
+
+        try {
+            currentMgr.connect(currentChannel, config, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.i(TAG, "[P2P-DIAG] connect() request accepted by framework for ${device.deviceName}")
+                }
+
+                override fun onFailure(reason: Int) {
+                    val reasonStr = when (reason) {
+                        WifiP2pManager.P2P_UNSUPPORTED -> "P2P Unsupported"
+                        WifiP2pManager.ERROR -> "Internal Error"
+                        WifiP2pManager.BUSY -> "System Busy"
+                        else -> "Error Code $reason"
+                    }
+                    Log.e(TAG, "[P2P-DIAG] connect() failed: $reasonStr")
+                    _statusMessage.value = "Connection failed: $reasonStr"
+                    transitionTo(P2PState.FAILED)
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "[P2P-DIAG] Exception invoking connect()", e)
+            _statusMessage.value = "Connection attempt failed"
+            transitionTo(P2PState.FAILED)
+        }
     }
 
     fun disconnect() {
-        if (manager == null || channel == null) return
-        
-        Log.i(TAG, "Disconnecting and removing P2P group")
-        manager.removeGroup(channel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() { 
-                Log.d(TAG, "Group removed successfully") 
+        Log.i(TAG, "[P2P-DIAG] Disconnect requested, tearing down P2P group")
+        val currentChannel = channel
+        if (manager != null && currentChannel != null) {
+            try {
+                manager.removeGroup(currentChannel, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        Log.i(TAG, "[P2P-DIAG] removeGroup() success")
+                        _connectionInfo.value = null
+                        transitionTo(P2PState.DISCONNECTED)
+                    }
+                    override fun onFailure(reason: Int) {
+                        Log.w(TAG, "[P2P-DIAG] removeGroup() failed: $reason")
+                        _connectionInfo.value = null
+                        transitionTo(P2PState.DISCONNECTED)
+                    }
+                })
+            } catch (e: Exception) {
+                Log.w(TAG, "[P2P-DIAG] Exception removing group: ${e.message}")
                 _connectionInfo.value = null
+                transitionTo(P2PState.DISCONNECTED)
             }
-            override fun onFailure(reason: Int) { Log.e(TAG, "Failed to remove group: $reason") }
-        })
+        } else {
+            _connectionInfo.value = null
+            transitionTo(P2PState.DISCONNECTED)
+        }
+    }
+
+    fun updateSocketState(connected: Boolean) {
+        if (connected) {
+            Log.i(TAG, "[P2P-DIAG] Socket connection verified! Transitioning to CONNECTED.")
+            transitionTo(P2PState.CONNECTED)
+            _statusMessage.value = "Connected"
+        } else {
+            if (_p2pState.value == P2PState.CONNECTED || _p2pState.value == P2PState.SOCKET_CONNECTING) {
+                Log.i(TAG, "[P2P-DIAG] Socket disconnected.")
+                transitionTo(P2PState.DISCONNECTED)
+                _statusMessage.value = "Disconnected"
+            }
+        }
+    }
+
+    fun resetState() {
+        Log.d(TAG, "[P2P-DIAG] Resetting state to IDLE")
+        _peers.value = emptyList()
+        _connectionInfo.value = null
+        _isDiscoveryActive.value = false
+        transitionTo(P2PState.IDLE)
+        _statusMessage.value = "Ready"
+    }
+
+    private fun transitionTo(newState: P2PState) {
+        Log.i(TAG, "[P2P-DIAG] P2P State transition: ${_p2pState.value} -> $newState")
+        _p2pState.value = newState
     }
 
     fun cleanup() {
-        Log.d(TAG, "Cleaning up WiFiDirectManager")
-        try {
-            context.unregisterReceiver(receiver)
-        } catch (e: Exception) {
-            // Ignored
-        }
+        Log.i(TAG, "[P2P-DIAG] Cleaning up WiFiDirectManager")
         stopDiscovery()
-    }
-
-    companion object {
-        private const val TAG = "WiFiDirectManager"
+        unregisterReceiverSafe()
+        _peers.value = emptyList()
+        _connectionInfo.value = null
+        transitionTo(P2PState.IDLE)
     }
 }

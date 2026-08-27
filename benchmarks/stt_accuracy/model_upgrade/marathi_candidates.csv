@@ -1,0 +1,6 @@
+Model ID,Architecture,Parameters (M),License,Original Format,HF Downloads,Target Quantization,Feasibility
+sumedh/wav2vec2-large-xlsr-marathi,Wav2Vec2-Large XLS-R CTC,315M,Apache 2.0,PyTorch / HF,397076,Dynamic INT8 ONNX,High (Standard CTC head)
+ravirajoshi/wav2vec2-large-xls-r-300m-marathi,Wav2Vec2-Large XLS-R CTC,315M,Apache 2.0,PyTorch / HF,20,Dynamic INT8 ONNX,High (Standard CTC head)
+Harveenchadha/vakyansh-wav2vec2-marathi-mrm-100,Wav2Vec2-Base CTC,95M,MIT,PyTorch / HF,158,Dynamic INT8 ONNX,Baseline (Acoustic confusion on space)
+shivam/xls-r-300m-marathi,Wav2Vec2-Large XLS-R CTC,315M,Apache 2.0,PyTorch / HF,9,Dynamic INT8 ONNX,Medium (Similar to sumedh)
+vittai23/whisper-small-marathi,Whisper Small (Autoregressive),244M,Apache 2.0,PyTorch / HF,2,INT8 ONNX,Marginal (Autoregressive latency high on CPU)

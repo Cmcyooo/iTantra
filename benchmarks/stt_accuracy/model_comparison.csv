@@ -1,0 +1,11 @@
+Language,Code,Engine,Current Model,Model Size (MB),Baseline WER (%),Optimized WER (%),CER (%),Avg Latency (ms),RTF,Status,Notes
+Hindi,hi,ONNX Runtime CTC,vakyansh_hindi_base.int8.onnx,122.7,17.32,16.80,4.00,118.4,0.110,PRODUCTION READY,High accuracy native Devanagari script.
+Telugu,te,ONNX Runtime CTC,vakyansh_telugu_base.int8.onnx,122.7,21.01,20.30,3.60,114.2,0.109,PRODUCTION READY,Crisp recognition of tactical phrases and numbers.
+English,en,sherpa-onnx Whisper,whisper-tiny-en.int8,39.8,31.17,16.90,12.10,142.6,0.094,PRODUCTION READY,Low latency greedy search with tactical post-processing.
+Tamil,ta,ONNX Runtime CTC,vakyansh_tamil_base.int8.onnx,122.7,25.00,24.20,5.60,105.8,0.108,PRODUCTION READY,Strong phoneme stability on Tamil tactical vocabulary.
+Gujarati,gu,ONNX Runtime CTC,vakyansh_gujarati_base.int8.onnx,122.7,39.19,37.80,13.80,112.5,0.110,CONDITIONAL,Functional for short commands; minor vowel matra confusions.
+Kannada,kn,ONNX Runtime CTC,vakyansh_kannada_base.int8.onnx,122.7,41.41,39.80,11.10,126.8,0.108,CONDITIONAL,Acceptable CER (11.1%); conjunct consonant merging on long sentences.
+Bengali,bn,ONNX Runtime CTC,vakyansh_bengali_base.int8.onnx,122.7,55.86,52.40,16.40,98.6,0.108,NEEDS BETTER MODEL,Base Vakyansh model struggles with complex conjuncts.
+Malayalam,ml,ONNX Runtime CTC,vakyansh_malayalam_base.int8.onnx,122.7,53.66,52.00,11.00,119.3,0.109,NEEDS BETTER MODEL,Agglutinative word-splitting causes high WER despite low CER.
+Marathi,mr,ONNX Runtime CTC,vakyansh_marathi_base.int8.onnx,122.7,65.03,65.70,21.00,108.2,0.108,NEEDS BETTER MODEL,Acoustic confusion on word boundary space tokens.
+Odia,or,ONNX Runtime CTC,vakyansh_odia_base.int8.onnx,122.7,87.77,85.60,25.30,110.5,0.107,REJECTED,Inadequate acoustic coverage in base model.

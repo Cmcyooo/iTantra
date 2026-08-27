@@ -65,10 +65,14 @@ class SherpaOnnxSttEngine(
             recognizer = OfflineRecognizer(null, config)
             Log.i(TAG, "SherpaOnnxSttEngine initialized successfully.")
             Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize SherpaOnnxSttEngine", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize SherpaOnnxSttEngine", t)
             recognizer = null
-            Result.failure(e)
+            try {
+                File(context.filesDir, "$MODEL_DIR/decoder.onnx").delete()
+                File(context.filesDir, "$MODEL_DIR/encoder.onnx").delete()
+            } catch (_: Exception) {}
+            Result.failure(t)
         }
     }
 
@@ -77,6 +81,8 @@ class SherpaOnnxSttEngine(
         if (samples.isEmpty()) return@withContext null
 
         try {
+            Log.i(TAG, "[STT-INFERENCE] language=${language.code} engine=SHERPA_WHISPER_TINY model=$MODEL_DIR tokens=$MODEL_DIR/tokens.txt samples=${samples.size} sr=16000")
+
             val audioDuration = samples.size.toDouble() / 16000.0
             var resultText = ""
 
@@ -84,12 +90,13 @@ class SherpaOnnxSttEngine(
                 val stream = rec.createStream()
                 stream.acceptWaveform(samples, 16000)
                 rec.decode(stream)
-                resultText = rec.getResult(stream).text.trim()
+                val rawText = rec.getResult(stream).text.trim()
+                resultText = IndicDomainNormalizer.normalize(rawText, language.code)
                 stream.release()
             }
 
             val rtf = if (audioDuration > 0) (processingTimeMs / 1000.0) / audioDuration else 0.0
-            Log.d(TAG, "Transcription complete. Text: '$resultText', Duration: ${"%.2f".format(audioDuration)}s, Time: ${processingTimeMs}ms, RTF: ${"%.3f".format(rtf)}")
+            Log.d(TAG, "[${language.displayName}] Audio: ${"%.2f".format(audioDuration)}s, Latency: ${processingTimeMs}ms, RTF: ${"%.3f".format(rtf)}")
 
             SttResult(
                 text = resultText,
@@ -111,15 +118,24 @@ class SherpaOnnxSttEngine(
 
     private fun copyAssetToFiles(context: Context, assetPath: String): File {
         val outFile = File(context.filesDir, assetPath)
-        if (outFile.exists() && outFile.length() > 0) {
+        val assetSize = try {
+            context.assets.openFd(assetPath).length
+        } catch (e: Exception) {
+            -1L
+        }
+        if (outFile.exists() && outFile.length() > 0 && (assetSize <= 0 || outFile.length() == assetSize)) {
             return outFile
         }
         outFile.parentFile?.mkdirs()
+        val tempFile = File(context.filesDir, "$assetPath.tmp")
+        tempFile.parentFile?.mkdirs()
         context.assets.open(assetPath).use { input ->
-            FileOutputStream(outFile).use { output ->
+            FileOutputStream(tempFile).use { output ->
                 input.copyTo(output)
             }
         }
+        if (outFile.exists()) outFile.delete()
+        tempFile.renameTo(outFile)
         return outFile
     }
 }

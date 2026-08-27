@@ -449,3 +449,94 @@
 ## 3. Stability & Leak Profile
 - **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** across all Bengali and Marathi test executions.
 - **Piper Marathi Google** demonstrated outstanding memory stability (**+3.77 MB** 10-cycle delta, zero leaks).
+
+---
+
+# Phase 8.9: Multilingual TTS Benchmarks (Odia)
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, ARM64, 5.7 GB RAM / 6 GB Mid-Range Target, Android 12)
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suite**: `com.itantra.app.TtsMultilingualValidationTest` (Test 19, 5 Phrases, 10-Cycle Stress)
+
+## 1. Candidate Voice Comparison & Runtime Metrics
+
+| Language | Model Candidate | Architecture | Size | Sample Rate | Cold Load Time (ms) | Avg Synthesis Latency | Avg RTF | Peak Process PSS | 10-Cycle Delta | Mobile Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Odia** | **`mms_ory`** | VITS (Meta MMS) | **108.76 MB** | 16,000 Hz | **1,237 ms** | **4,473 ms** (4.3s speech) | **1.033** | **392.84 MB** | **+5.36 MB** | **CONDITIONAL BASELINE** |
+
+## 2. Tactical Phrase Breakdown (Physical Hardware)
+
+| Model | Emergency 1 (RTF) | Emergency 2 (RTF) | Location (RTF) | Numbers (RTF) | Radio Check (RTF) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`mms_ory`** | 4557ms / **1.028** | 5137ms / **1.072** | 4223ms / **1.048** | 4744ms / **1.032** | 3703ms / **0.978** |
+
+## 3. Stability & Leak Profile
+- **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** during Odia test execution.
+- **Meta MMS Odia** demonstrated outstanding memory stability (**+5.36 MB** 10-cycle delta, zero leaks).
+
+---
+
+# Phase 9: Production Multilingual TTS Integration Benchmarks
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, ARM64, 5.7 GB RAM / 6 GB Mid-Range Target, Android 12)
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suites**: `com.itantra.app.MultilingualTtsIntegrationTest` & `com.itantra.app.EndToEndLoopTest`
+
+## 1. Single-Active Sequential Language Switching Lifecycle (10 Languages)
+
+| Transition | Target Language | Active Voice Engine | Model Type | Load Time (ms) | Peak Process PSS (MB) | Engine Lifecycle State | Status |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| Baseline | **English** | `piper_en_amy` | Piper VITS | 1,935 ms | 291.5 MB | `READY` | **PASS** |
+| 1 | **Hindi** | `piper_hi_priyamvada` | Piper VITS | 2,438 ms | 299.8 MB | `READY` | **PASS** |
+| 2 | **Marathi** | `piper_mr_google` | Piper VITS | 1,441 ms | 301.2 MB | `READY` | **PASS** |
+| 3 | **Bengali** | `piper_bn_google` | Piper VITS | 1,487 ms | 302.1 MB | `READY` | **PASS** |
+| 4 | **Telugu** | `piper_te_maya` | Piper VITS | 1,231 ms | 303.4 MB | `READY` | **PASS** |
+| 5 | **Malayalam** | `piper_ml_meera` | Piper VITS | 1,257 ms | 304.0 MB | `READY` | **PASS** |
+| 6 | **Tamil** | `piper_ta_rasa_female` | Piper VITS | 2,385 ms | 304.2 MB | `READY` | **PASS** |
+| 7 | **Gujarati** | `mms_guj` | Meta MMS | 1,180 ms | 304.5 MB | `READY` | **PASS** |
+| 8 | **Kannada** | `mms_kan` | Meta MMS | 1,353 ms | 304.9 MB | `READY` | **PASS** |
+| 9 | **Odia** | `mms_ory` | Meta MMS | 1,500 ms | 305.0 MB | `READY` | **PASS** |
+| 10 | **English** | `piper_en_amy` | Piper VITS | 1,937 ms | 305.2 MB | `READY` | **PASS** |
+
+*All 10 voice switches completed with process PSS bounded at ~305 MB, well below the 450 MB ceiling, proving strict memory deallocation of previous engines.*
+
+## 2. End-to-End Multilingual Speech Pipeline
+
+| Language | Test Phrase | Speech Duration | Synthesis Time | RTF | Speaker Audio Output |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **English** | *"Emergency alert, immediate assistance needed in sector four."* | 4.03 s | 839 ms | **0.208** | **CONFIRMED** |
+| **Hindi** | *"आपातकालीन चेतावनी, सेक्टर चार में तुरंत सहायता की आवश्यकता है।"* | 5.18 s | 909 ms | **0.176** | **CONFIRMED** |
+| **Marathi** | *"तातडीचा इशारा, सेक्टर चारमध्ये तातडीने मदतीची गरज आहे."* | 4.32 s | 837 ms | **0.194** | **CONFIRMED** |
+| **Bengali** | *"জরুরী সতর্কতা, চার নম্বর সেক্টরে অবিলম্বে সহায়তা প্রয়োজন।"* | 3.37 s | 773 ms | **0.229** | **CONFIRMED** |
+| **Telugu** | *"అత్యవసర హెచ్చరిక, సెక్టార్ నాలుగులో తక్షణ సహాయం అవసరం."* | 4.42 s | 896 ms | **0.203** | **CONFIRMED** |
+| **Malayalam** | *"അടിയന്തര മുന്നറിയിപ്പ്, സെക്ടർ നാലിൽ ഉടനടി സഹായം ആവശ്യമാണ്."* | 4.36 s | 829 ms | **0.190** | **CONFIRMED** |
+| **Tamil** | *"அவசர எச்சரிக்கை, பிரிவு நான்கில் உடனடி உதவி தேவைப்படுகிறது."* | 3.43 s | 788 ms | **0.230** | **CONFIRMED** |
+| **Odia** | *"ଜରୁରୀ ସତର୍କତା, ଚାରି ନମ୍ବର ସେକ୍ଟରରେ ତୁରନ୍ତ ସାହାଯ୍ୟ ଆବଶ୍ୟକ।"* | 4.12 s | 7,748 ms | **1.880** | **CONFIRMED** |
+
+## 3. Emergency Alert Playback Integration
+- Enqueued high-priority `P2PMessage` (`ALERT`) into `AlertPlaybackManager`.
+- Verified audio focus acquisition (`USAGE_ALARM`).
+- Synthesized and played emergency alert in full, invoking completion listener in 3,552 ms.
+- Zero ANRs, zero SIGSEGV crashes.
+
+---
+
+# Phase 11: Zero-Configuration Emergency Autonomous Pipeline Benchmarks
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, Android 12, 6 GB RAM)
+* **Execution Environment**: ART / Instrumented Android Testing (`com.itantra.app.ZeroConfigEmergencyAndroidTest`)
+* **Radio Transports Evaluated**: Local Wi-Fi, Wi-Fi Direct (P2P), Bluetooth Classic (RFCOMM)
+
+## 1. On-Device Hardware Instrumentation Suite
+
+| Test ID | Test Scenario | Description | Result | Execution Time | Memory / Stability |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **Test 01** | `test01_PeerRegistryAggregationAndBestCandidate` | Multi-transport peer aggregation across Wi-Fi, P2P, and Bluetooth; priority ranking (Connected > Validated > Wi-Fi > P2P > BT); friendly identity resolution stripping raw MACs. | **PASSED** | 74 ms | Zero leaks; clean StateFlow emission |
+| **Test 02** | `test02_ZeroConfigEmergencyWorkflowWhenConnected` | 1-Touch Help trigger when already connected $\rightarrow$ instant transition to `READY` $\rightarrow$ Voice capture $\rightarrow$ STT $\rightarrow$ `ALERT` packet dispatch $\rightarrow$ Remote `ACK` receipt $\rightarrow$ State transitions to `DELIVERED`. | **PASSED** | 384 ms | Zero leaks; ACK delivery confirmation verified |
+| **Test 03** | `test03_ZeroConfigEmergencyNoPeerFailureHandling` | 1-Touch Help trigger when no peers reachable $\rightarrow$ `SEARCHING` $\rightarrow$ Search timeout watchdog $\rightarrow$ Honest transition to `FAILED` (`"No reachable iTantra device found"`). | **PASSED** | 1,210 ms | Zero crashes; honest failure reported |
+
+**Suite Total Execution Time**: **1.724 s**  
+**Success Rate**: **3 / 3 (100%)**  
+**Native Crashes / SIGSEGV**: **0**  
+**Memory Leaks / Creep**: **0 MB**  
+

@@ -82,9 +82,12 @@ class CommunicationManager(initialTransport: Transport) {
         _transport.disconnect()
     }
 
+    private val pendingAcks = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     fun getConnectedPeerId(): String? = _transport.getConnectedPeerId()
 
     fun sendText(text: String, language: String = "en", senderName: String? = null): P2PMessage {
+        val sendStartTime = android.os.SystemClock.elapsedRealtime()
         val message = P2PMessage(
             messageId = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
@@ -94,6 +97,9 @@ class CommunicationManager(initialTransport: Transport) {
             messageType = P2PMessage.MESSAGE_TYPE_NORMAL,
             priority = P2PMessage.PRIORITY_NORMAL
         )
+        if (text.isNotEmpty()) {
+            pendingAcks[message.messageId] = sendStartTime
+        }
         try {
             _transport.sendMessage(message)
         } catch (e: Exception) {
@@ -110,6 +116,7 @@ class CommunicationManager(initialTransport: Transport) {
      * Sends a HIGH-priority Emergency Alert message.
      */
     fun sendAlert(text: String, language: String = "en", senderName: String? = null): P2PMessage {
+        val sendStartTime = android.os.SystemClock.elapsedRealtime()
         val message = P2PMessage(
             messageId = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
@@ -119,6 +126,7 @@ class CommunicationManager(initialTransport: Transport) {
             messageType = P2PMessage.MESSAGE_TYPE_ALERT,
             priority = P2PMessage.PRIORITY_HIGH
         )
+        pendingAcks[message.messageId] = sendStartTime
         try {
             _transport.sendMessage(message)
         } catch (e: Exception) {
@@ -160,17 +168,24 @@ class CommunicationManager(initialTransport: Transport) {
 
     private fun handleReceivedMessage(message: P2PMessage) {
         managerScope.launch {
-            val now = System.currentTimeMillis()
-            val transportLatency = now - message.timestamp
-            _latency.value = transportLatency
-
             if (message.isAck) {
-                Log.d(TAG, "Received ACK for message: ${message.text}")
+                val targetId = message.text
+                val sentTime = pendingAcks.remove(targetId)
+                if (sentTime != null) {
+                    val rttMs = android.os.SystemClock.elapsedRealtime() - sentTime
+                    _latency.value = rttMs
+                    Log.i(TAG, "[TELEMETRY-TRANSPORT] utteranceId=$targetId RTT=${rttMs}ms")
+                }
                 onAckReceivedListener?.invoke(message.text)
                 return@launch
             }
+
+            // Immediately send ACK for received message so sender can measure RTT
+            if (message.text.isNotEmpty()) {
+                sendAck(message.messageId)
+            }
             
-            Log.d(TAG, "Received message: ${message.text} [type=${message.messageType}, priority=${message.priority}], Latency: ${transportLatency}ms")
+            Log.d(TAG, "Received message: utteranceId=${message.utteranceId} [type=${message.messageType}, priority=${message.priority}, lang=${message.language}]")
             
             _lastMessage.value = message
             addMessageToList(message)

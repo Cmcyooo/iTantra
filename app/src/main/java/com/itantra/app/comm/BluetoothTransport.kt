@@ -60,13 +60,15 @@ class BluetoothTransport : Transport {
             try {
                 if (targetId.isNullOrBlank()) {
                     // Host mode: Start BluetoothServerSocket
+                    Log.i(TAG, "[BT-DIAG] Connect request: Host mode (Listening for incoming RFCOMM)...")
                     startServer()
                 } else {
                     // Client mode: Connect to BluetoothDevice address
+                    Log.i(TAG, "[BT-DIAG] Connect request: Client mode connecting to $targetId...")
                     startClient(targetId)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Connection failed", e)
+                Log.e(TAG, "[BT-DIAG] Connection failed: ${e.message}", e)
                 _lastError.value = e.message
                 _connectionState.value = ConnectionState.ERROR
                 cleanup()
@@ -76,28 +78,30 @@ class BluetoothTransport : Transport {
 
     @SuppressLint("MissingPermission")
     private suspend fun startServer() = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Starting server...")
+        Log.d(TAG, "[BT-DIAG] Starting RFCOMM server socket...")
         serverSocket = bluetoothAdapter?.listenUsingRfcommWithServiceRecord(NAME, MY_UUID)
         
         val socket = try {
             serverSocket?.accept()
         } catch (e: IOException) {
-            Log.e(TAG, "Socket accept() failed", e)
+            Log.e(TAG, "[BT-DIAG] RFCOMM accept() failed: ${e.message}")
             null
         }
         
         if (socket != null) {
+            Log.i(TAG, "[BT-DIAG] RFCOMM server accepted connection from ${socket.remoteDevice.address}")
             setupConnection(socket)
-            serverSocket?.close() // Close server socket after accepting one connection
+            try { serverSocket?.close() } catch (ignored: Exception) {}
             serverSocket = null
         }
     }
 
     @SuppressLint("MissingPermission")
     private suspend fun startClient(address: String) = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Connecting to device: $address")
+        Log.i(TAG, "[BT-DIAG] Connecting to remote RFCOMM device: $address")
         val device: BluetoothDevice? = bluetoothAdapter?.getRemoteDevice(address)
         if (device == null) {
+            Log.e(TAG, "[BT-DIAG] Device not found for address $address")
             throw IOException("Device not found")
         }
         
@@ -106,9 +110,11 @@ class BluetoothTransport : Transport {
         
         try {
             socket.connect()
+            Log.i(TAG, "[BT-DIAG] RFCOMM client successfully connected to $address")
             setupConnection(socket)
         } catch (e: IOException) {
-            socket.close()
+            Log.e(TAG, "[BT-DIAG] RFCOMM socket.connect() failed: ${e.message}")
+            try { socket.close() } catch (ignored: Exception) {}
             throw e
         }
     }
@@ -117,7 +123,7 @@ class BluetoothTransport : Transport {
         clientSocket = socket
         writer = PrintWriter(socket.outputStream, true)
         _connectionState.value = ConnectionState.CONNECTED
-        Log.i(TAG, "Connected to ${socket.remoteDevice.name ?: socket.remoteDevice.address}")
+        Log.i(TAG, "[BT-DIAG] RFCOMM Transport fully CONNECTED to ${socket.remoteDevice.name ?: socket.remoteDevice.address}")
 
         startReceiving(socket)
     }
@@ -126,18 +132,20 @@ class BluetoothTransport : Transport {
         receiverJob = transportScope.launch {
             try {
                 val reader = BufferedReader(InputStreamReader(socket.inputStream))
+                Log.d(TAG, "[BT-DIAG] Receiver loop started")
                 while (isActive) {
                     val line = reader.readLine() ?: break
                     try {
                         val message = Json.decodeFromString<P2PMessage>(line)
+                        Log.d(TAG, "[BT-DIAG] Received message: ${message.messageId}")
                         onMessageReceived?.invoke(message)
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to parse message: $line", e)
+                        Log.w(TAG, "[BT-DIAG] Failed to parse message: $line", e)
                     }
                 }
             } catch (e: Exception) {
                 if (isActive) {
-                    Log.e(TAG, "Receiver error", e)
+                    Log.e(TAG, "[BT-DIAG] Receiver error: ${e.message}")
                     _lastError.value = "Connection lost: ${e.message}"
                     _connectionState.value = ConnectionState.ERROR
                 }
@@ -154,10 +162,30 @@ class BluetoothTransport : Transport {
             try {
                 val json = Json.encodeToString(message)
                 writer?.println(json)
-                Log.d(TAG, "Sent message: ${message.messageId}")
+                Log.d(TAG, "[BT-DIAG] Sent message: ${message.messageId}")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to send message", e)
+                Log.e(TAG, "[BT-DIAG] Failed to send message: ${e.message}")
                 _lastError.value = "Send failed: ${e.message}"
+            }
+        }
+    }
+
+    fun send(message: P2PMessage, onDeliveryStatus: ((DeliveryStatus) -> Unit)?) {
+        transportScope.launch {
+            if (_connectionState.value != ConnectionState.CONNECTED || writer == null) {
+                onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
+                return@launch
+            }
+            try {
+                val json = Json.encodeToString(message)
+                writer?.println(json)
+                if (writer?.checkError() == true) {
+                    onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
+                } else {
+                    onDeliveryStatus?.invoke(DeliveryStatus.DELIVERED)
+                }
+            } catch (e: Exception) {
+                onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
             }
         }
     }

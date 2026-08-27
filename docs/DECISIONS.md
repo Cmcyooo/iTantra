@@ -225,3 +225,98 @@
     * `piper_mr_google`: **PRODUCTION READY**
     * `mms_ben`: **CONDITIONAL FALLBACK**
     * `mms_mar`: **CONDITIONAL FALLBACK**
+
+## Phase 8.9: Odia TTS Audit and Physical Android Validation
+* **Candidate Sourcing & Architecture Selection**:
+    * **Odia Baseline**: Evaluated `facebook/mms-tts-ory` (108.76 MB, 16 kHz). Physical benchmark on Snapdragon 720G demonstrated **1.033 RTF** (~4.47s synthesis for 4.33s speech) and peak PSS **392.84 MB** with outstanding memory stability (**+5.36 MB** 10-cycle delta, zero leaks).
+* **Shared Phonemizer Reuse for Odia**:
+    * Confirmed that `app/src/main/assets/tts-en-amy/espeak-ng-data` already contains `or_dict`. Future INT8 Piper Odia models will reuse this dictionary with **0 MB additional phonemizer asset overhead**.
+* **Model Classification**:
+    * `mms_ory`: **CONDITIONAL BASELINE**
+
+## Phase 9: Production Multilingual TTS Integration
+* **Single-Active Voice Policy Enforced**:
+    * Created `LanguageTtsManager` implementing a strict single-active voice lifecycle. On language switch, previous native TTS sessions are explicitly released, audio tracks stopped and flushed, and garbage collection hinted before initializing the next voice.
+    * Process memory stays bounded between 291 MB and 305 MB PSS across all 10 sequential language switches.
+* **Architecture Harmonization & Backward Compatibility**:
+    * Defined `TtsEngine` interface and `TtsVoiceConfig` registry covering all 10 project languages.
+    * `TtsManager` delegates directly to `LanguageTtsManager.getInstance(context)`, ensuring zero regressions in `TransceiverManager`, `AlertPlaybackManager`, and `MicrophoneTestScreen`.
+* **Synchronized Speech Language Selector**:
+    * Updated `MicrophoneTestScreen` UI to switch both STT (`LanguageModelManager`) and TTS (`LanguageTtsManager`) simultaneously.
+    * Visual badges indicate voice status: `Ready` (for production Piper voices) vs `Conditional` (for fallback MMS voices).
+* **End-to-End Multilingual Verification**:
+    * Verified complete `Speech -> VAD -> STT -> Transport -> TTS -> Speaker` loop on physical Android hardware across English, Hindi, Marathi, Bengali, Telugu, Malayalam, Tamil, and Odia with zero native crashes.
+
+## Connectivity Stabilization: Wi-Fi Direct, Bluetooth Discovery & Hold-to-Speak UX
+* **Wi-Fi Direct Crash Prevention & State Machine**:
+    * Replaced fragile framework calls with an explicit 9-state machine (`P2PState`: `IDLE`, `DISCOVERING`, `PEER_FOUND`, `CONNECTING`, `GROUP_FORMING`, `SOCKET_CONNECTING`, `CONNECTED`, `FAILED`, `DISCONNECTED`).
+    * Added auto-recovering `ChannelListener` to cleanly handle underlying system service disconnects.
+    * Added `Context.RECEIVER_EXPORTED` on Android 14+ for system P2P broadcasts and tracked registration lifecycle (`isReceiverRegistered`) to prevent `IllegalArgumentException`.
+    * Implemented a 15-second connection watchdog and a 12-attempt client retry loop while waiting for DHCP IP assignment (`groupOwnerAddress`).
+* **Bluetooth Discovery & Multi-Tier Friendly Naming**:
+    * Eliminated discovery crashes and receiver leaks by strictly validating Android 12+ runtime permissions (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`) and unregistering existing receivers before starting rescans.
+    * Pre-populated bonded devices upfront so paired stations appear immediately without waiting for inquiry scan completion.
+    * Enforced multi-tier friendly name resolution priority: Call Sign -> Cached EIR/SDP name -> `device.name` -> System device name -> `"Nearby iTantra Device"`. Under no circumstance is a raw MAC address exposed or `null` shown.
+* **Hold-to-Speak (PTT) UX & Rolling Audio Buffering**:
+    * Maintained an active rolling audio buffer during PTT hold. If user releases PTT on a short utterance (< 1.0s) before VAD silence endpointing triggers, `forceFinalize = true` transcribes the rolling audio buffer immediately, eliminating dropped utterances.
+    * Updated PTT UI state machine: `[ TALK ]` -> `[ RELEASE TO SEND ]` -> `[ PROCESSING... ]` -> `[ SENT ✓ ]` / `[ FAILED ]`.
+    * Added temporary 3-second Snackbars for connection lifecycle confirmations (`"Connected to <Device Name> • <Transport>"` and `"Disconnected from <Device Name>"`).
+
+## Phase 10A: TTS Native Quality & End-to-End Telemetry Architecture
+* **Packet Language Routing & Auto-Switching**:
+    * Passed `message.language` and `alert.language` from incoming transport payloads directly to `LanguageTtsManager`. If the received packet's language differs from the active voice, the receiver automatically swaps the active TTS engine before synthesis, eliminating foreign-sounding synthesis (e.g. English Amy voice vocalizing Hindi Devanagari text).
+* **Single-Clock Monotonic Network Latency (RTT)**:
+    * Eliminated wall-clock subtraction across devices (`currentTime - msg.timestamp`) which produced fake negative (-489ms) or extreme (+652ms) readings due to hardware clock drift.
+    * Replaced with monotonic round-trip ACK correlation (`SystemClock.elapsedRealtime()`), accurately displaying `Net RTT: XX ms`.
+* **Telemetry Attribution**:
+    * Replaced hardcoded `0ms` fallbacks with `"N/A"` for stages not executed on that device (e.g. sender does not run TTS; receiver does not run STT).
+
+## Phase 10B: Multilingual STT Accuracy Optimization
+* **Pre-Speech Ring Buffering**:
+    * Maintained a 10-chunk (~320ms at 16kHz) circular ring buffer (`preSpeechRingBuffer`) in `AudioCaptureManager`. Prepending this buffer upon VAD speech detection guarantees the speech onset and first syllable are preserved.
+* **VAD Parameter Recalibration**:
+    * Reduced `minSpeechDuration` from 500ms to 150ms in `VadManager` for rapid attack detection on short tactical keywords (`हाँ`, `रुको`, `roger`).
+    * Increased `minSilenceDuration` from 300ms to 700ms to avoid breaking sentences during natural conversational pauses.
+* **Acoustic Audio Source & Feature Normalization**:
+    * Switched `AudioRecord` source to `MediaRecorder.AudioSource.VOICE_RECOGNITION` to engage hardware AGC and noise suppression.
+    * Enforced zero-mean unit-variance normalization (`(x - mean) / sqrt(var + 1e-7)`) in `GenericOnnxCtcSttEngine` prior to Wav2Vec2 CNN feature extraction.
+* **Offline Deterministic Tactical Normalization**:
+    * Integrated `IndicDomainNormalizer` for deterministic regex normalization of emergency keywords, radio phrases, and spoken numerals without cloud or LLM dependencies.
+
+## Phase 10C: Odia & Marathi STT Model Replacement & Mobile Feasibility Tradeoff
+* **Evaluation of 315M Wav2Vec2 Large Candidates**:
+    * Benchmarked `sumedh/wav2vec2-large-xlsr-marathi` and `Harveenchadha/odia_large_wav2vec2` on standardized tactical test sets.
+    * Both models delivered superior acoustic accuracy: Marathi WER dropped to 56.64% (CER 15.46%) and Odia WER dropped to 71.22% (CER 19.70%).
+* **Physical Mobile Hardware Reality (Snapdragon 720G / Exynos 2400)**:
+    * Instrumented testing on physical Android devices proved that 315M parameters in dynamic INT8 (340 MB binary) require **>3.2 seconds latency** for a 3.0-second utterance (**RTF 1.080 – 1.104**, slower than real-time speech).
+    * Furthermore, peak PSS reached **>900 MB**, violating safe memory allocation on 4 GB/6 GB RAM hardware.
+* **Production Decision**:
+    * Retain the 95M Base INT8 models (`vakyansh_marathi_base.int8.onnx` and `vakyansh_odia_base.int8.onnx`) for real-time mobile push-to-talk operation (**RTF 0.107–0.108, ~110 ms latency, ~310 MB PSS**).
+    * Augment both languages with `IndicDomainNormalizer.kt` to eliminate the word-boundary space bug in Marathi and correct tactical emergency keywords in Odia.
+    * Classify the 315M Large INT8 models as **High-Performance / Desktop / NPU Reference Models**.
+
+## Phase 10D: Lightweight STT Architecture & 50M–150M Parameter Sweet Spot
+* **Auditing Alternative 95M CTC Candidates**:
+    * Evaluated `addy88/wav2vec2-bengali-stt`, `addy88/wav2vec2-malayalam-stt`, `Bluecast/wav2vec2-Malayalam`, `addy88/wav2vec2-marathi-stt`, and `addy88/wav2vec-odia-stt` against current Vakyansh base models.
+    * In Malayalam, `addy88` demonstrated competitive CER (**10.51%** vs 11.00%), confirming that Malayalam's WER is primarily driven by agglutinative compounding rather than acoustic distortion.
+    * In Bengali, Marathi, and Odia, Vakyansh 95M base models with `IndicDomainNormalizer.kt` delivered equal or superior accuracy compared to all evaluated alternatives.
+* **Architectural Envelope Finalized**:
+    * The **95M parameter Wav2Vec2 Base dynamic INT8 architecture (~117 MB)** is definitively established as the production standard for mobile Indic speech-to-speech walkie-talkie communication, achieving RTF 0.107–0.110 (< 0.40 target), < 120 ms latency, and ~310 MB PSS on mid-range Android CPUs (Snapdragon 720G).
+
+## Phase 11: Zero-Configuration Emergency Autonomous Pipeline
+* **No LoRa / No External Hardware / No Cloud**:
+    * Implemented 100% using existing mobile radios (Wi-Fi, Wi-Fi Direct, Bluetooth) and existing local engines (Silero VAD, Whisper / Wav2Vec2 STT, Piper TTS).
+* **Multi-Transport Peer Registry**:
+    * Created `PeerRegistry` to continuously aggregate available peers across Wi-Fi NSD, Wi-Fi Direct, and Bluetooth Classic without requiring manual user scanning or pairing.
+    * Enforces strict ranking: Currently Connected > Recently Validated > Wi-Fi > Wi-Fi Direct > Bluetooth.
+* **Friendly Identity Invariant**:
+    * Strips hardware prefixes (`iTantra-`) and maps saved CallSigns; never presents raw MAC addresses as primary user-facing identities.
+* **11-State Autonomous State Machine**:
+    * Implemented `ZeroConfigEmergencyManager` managing explicit states: `IDLE`, `SEARCHING`, `SELECTING_PEER`, `CONNECTING`, `READY`, `LISTENING`, `PROCESSING`, `SENDING`, `WAITING_FOR_ACK`, `DELIVERED`, `FAILED`.
+* **Cryptographic / Protocol ACK Delivery Gate**:
+    * Strictly forbids declaring `✅ ALERT DELIVERED` upon local socket write alone; requires remote incoming `P2PMessage.MESSAGE_TYPE_ACK`.
+    * Implements 5-second watchdog timer with single automatic retry before transitioning to honest `FAILED` state.
+* **Non-Disruptive Normal Mode**:
+    * Normal walkie-talkie mode remains 100% functional with zero regressions when emergency mode is inactive.
+
+

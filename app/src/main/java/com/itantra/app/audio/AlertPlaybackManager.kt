@@ -146,7 +146,7 @@ class AlertPlaybackManager(
             val alertStartTime = System.currentTimeMillis()
             onAlertPlaybackStarted?.invoke(alert, alertStartTime)
 
-            Log.i(TAG, "🚨 Commencing Alert Playback: '${alert.text}' from ${alert.senderName ?: "Unknown"}")
+            Log.i(TAG, "🚨 Commencing Alert Playback: utteranceId=${alert.utteranceId} from ${alert.senderName ?: "Unknown"} [lang=${alert.language}]")
 
             // Request AudioFocus with Exclusive Priority
             val focusGranted = requestAlertFocus()
@@ -157,13 +157,31 @@ class AlertPlaybackManager(
                 _focusError.value = null
             }
 
-            // Synthesize using Piper TTS
-            val generatedAudio = ttsManager.generateSpeech(alert.text)
+            // Synthesize using active or target language TTS
+            val ttsStartTime = android.os.SystemClock.elapsedRealtime()
+            val generatedAudio = ttsManager.generateSpeech(alert.text, alert.language)
+            val ttsEndTime = android.os.SystemClock.elapsedRealtime()
+            val ttsDurationMs = ttsEndTime - ttsStartTime
+
             if (generatedAudio == null || generatedAudio.samples.isEmpty()) {
-                Log.e(TAG, "Failed to synthesize speech for alert '${alert.text}'")
+                Log.e(TAG, "Failed to synthesize speech for alert utteranceId=${alert.utteranceId}")
                 finishAlert(alert, alertStartTime)
                 return@launch
             }
+
+            val playbackStartTime = android.os.SystemClock.elapsedRealtime()
+            val audioStartDelayMs = playbackStartTime - ttsEndTime
+
+            val currentLang = ttsManager.languageTtsManager.currentLanguage.value
+            val currentVoiceConfig = TtsVoiceConfig.getConfigFor(currentLang)
+
+            Log.i(
+                TAG,
+                "[TELEMETRY-RECEIVER] utteranceId=${alert.utteranceId} language=${alert.language} " +
+                "TTS_language=${currentVoiceConfig.language.code} TTS_engine=${currentVoiceConfig.type} " +
+                "TTS_model=${currentVoiceConfig.modelDirName} TTS_START->TTS_END=${ttsDurationMs}ms " +
+                "TTS_END->AUDIO_PLAYBACK_START=${audioStartDelayMs}ms"
+            )
 
             // Play via AudioTrack with USAGE_ALARM / SPEECH
             val alertAttributes = AudioAttributes.Builder()
@@ -184,7 +202,7 @@ class AlertPlaybackManager(
     private fun finishAlert(alert: P2PMessage, startTime: Long) {
         scope.launch {
             val finishTime = System.currentTimeMillis()
-            Log.i(TAG, "✓ Emergency alert playback completed in ${finishTime - startTime}ms")
+            Log.i(TAG, "✓ Emergency alert playback completed for utteranceId=${alert.utteranceId} in ${finishTime - startTime}ms")
             onAlertPlaybackFinished?.invoke(alert, finishTime)
 
             // Abandon alert focus and restore audio state
@@ -200,9 +218,22 @@ class AlertPlaybackManager(
     private fun playNormalInternal(message: P2PMessage) {
         scope.launch {
             _isNormalPlaying.value = true
-            Log.d(TAG, "Playing normal message: '${message.text}'")
+            Log.d(TAG, "Playing normal message: utteranceId=${message.utteranceId} [lang=${message.language}]")
 
-            ttsManager.speak(message.text) {
+            val ttsStartTime = android.os.SystemClock.elapsedRealtime()
+            ttsManager.speak(message.text, message.language) {
+                val playbackStartTime = android.os.SystemClock.elapsedRealtime()
+                val currentLang = ttsManager.languageTtsManager.currentLanguage.value
+                val currentVoiceConfig = TtsVoiceConfig.getConfigFor(currentLang)
+                val ttsDurationMs = ttsManager.lastResult.value?.synthesisTimeMs ?: (playbackStartTime - ttsStartTime)
+
+                Log.i(
+                    TAG,
+                    "[TELEMETRY-RECEIVER] utteranceId=${message.utteranceId} language=${message.language} " +
+                    "TTS_language=${currentVoiceConfig.language.code} TTS_engine=${currentVoiceConfig.type} " +
+                    "TTS_model=${currentVoiceConfig.modelDirName} TTS_START->TTS_END=${ttsDurationMs}ms"
+                )
+
                 scope.launch {
                     _isNormalPlaying.value = false
                     // Continue queue processing

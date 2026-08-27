@@ -82,7 +82,12 @@ class LanguageModelManager(private val context: Context) {
         }
 
         // 3. Initialize new engine
-        val initResult = newEngine.initialize(context)
+        val initResult = try {
+            newEngine.initialize(context)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Uncaught error during ${targetLanguage.displayName} initialize", t)
+            Result.failure(t)
+        }
         if (initResult.isSuccess) {
             activeEngine = newEngine
             _currentLanguage.value = targetLanguage

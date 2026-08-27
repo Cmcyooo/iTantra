@@ -46,6 +46,9 @@ android {
             pickFirsts += "**/libonnxruntime.so"
         }
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

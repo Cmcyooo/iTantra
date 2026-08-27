@@ -46,12 +46,12 @@ class VadManager(context: Context) {
             
             Log.i(TAG, "Model copied to: ${modelFile.absolutePath}, size: ${modelFile.length()} bytes")
 
-            // Configure Silero VAD with slightly more aggressive endpointing
+            // Configure Silero VAD with optimized speech onset and natural pause tolerance
             val sileroConfig = SileroVadModelConfig(
                 modelFile.absolutePath,
-                0.5f,  // threshold
-                0.5f,  // minSpeechDuration
-                0.3f,  // minSilenceDuration (Reduced from 0.5s to 0.3s for faster turn-around)
+                0.5f,   // threshold
+                0.15f,  // minSpeechDuration: 150ms ensures rapid onset capture without clipping first syllable
+                0.7f,   // minSilenceDuration: 700ms prevents premature utterance cutoff during natural pauses
                 windowSize
             )
             

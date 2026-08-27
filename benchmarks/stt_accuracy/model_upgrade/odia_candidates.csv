@@ -1,0 +1,6 @@
+Model ID,Architecture,Parameters (M),License,Original Format,HF Downloads,Target Quantization,Feasibility
+Harveenchadha/odia_large_wav2vec2,Wav2Vec2-Large CTC,315M,Apache 2.0,PyTorch / HF,632,Dynamic INT8 ONNX,High (Trained on broader Odia corpus)
+anuragshas/wav2vec2-large-xlsr-53-odia,Wav2Vec2-Large XLSR-53 CTC,315M,Apache 2.0,PyTorch / HF,12,Dynamic INT8 ONNX,High (Standard CTC head)
+infinitejoy/wav2vec2-large-xls-r-300m-odia,Wav2Vec2-Large XLS-R 300M CTC,315M,Apache 2.0,PyTorch / HF,11,Dynamic INT8 ONNX,High (Standard CTC head)
+Harveenchadha/vakyansh-wav2vec2-odia-orm-100,Wav2Vec2-Base CTC,95M,MIT,PyTorch / HF,32,Dynamic INT8 ONNX,Baseline (Inadequate acoustic diversity)
+sam2ai/wav2vec2-large-mms-1b-odia,MMS-1B CTC,1000M,CC-BY-NC 4.0,PyTorch / HF,1,INT8 ONNX,Rejected (Exceeds RAM budget & Non-commercial license)

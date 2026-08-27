@@ -16,10 +16,18 @@ import java.net.Socket
 /**
  * Wi-Fi Direct implementation of the Transport interface.
  * Wraps WiFiDirectManager for connection and uses TCP Sockets for data.
+ * Adheres strictly to the 15-second timeout, socket retry loop, and diagnostic logging.
  */
 class WiFiDirectTransport(
     private val wifiDirectManager: WiFiDirectManager
 ) : Transport {
+
+    companion object {
+        private const val TAG = "WiFiDirectTransport"
+        private const val PORT = 8888
+        private const val CONNECTION_TIMEOUT_MS = 15000L
+    }
+
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
@@ -34,17 +42,14 @@ class WiFiDirectTransport(
     
     private var onMessageReceived: ((P2PMessage) -> Unit)? = null
     private val transportScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val PORT = 8888
-    private val CONNECTION_TIMEOUT_MS = 15000L
 
     private var connectionMonitorJob: Job? = null
 
     init {
-        Log.i(TAG, "Initializing WiFiDirectTransport")
-        // Monitor WiFiDirectManager connection info
+        Log.i(TAG, "[P2P-DIAG] Initializing WiFiDirectTransport")
         connectionMonitorJob = transportScope.launch {
             wifiDirectManager.connectionInfo.collect { info ->
-                Log.d(TAG, "Observed connection info change: groupFormed=${info?.groupFormed}")
+                Log.d(TAG, "[P2P-DIAG] Observed connection info change: groupFormed=${info?.groupFormed}")
                 handleConnectionInfo(info)
             }
         }
@@ -53,7 +58,7 @@ class WiFiDirectTransport(
     private fun handleConnectionInfo(info: WifiP2pInfo?) {
         if (info == null) {
             if (_connectionState.value != ConnectionState.DISCONNECTED) {
-                Log.d(TAG, "Connection info cleared, disconnecting transport")
+                Log.d(TAG, "[P2P-DIAG] Connection info cleared, disconnecting transport")
                 disconnect()
             }
             return
@@ -61,11 +66,11 @@ class WiFiDirectTransport(
 
         if (info.groupFormed) {
             if (_connectionState.value == ConnectionState.CONNECTED) {
-                Log.d(TAG, "Already connected, ignoring redundant group formed info")
+                Log.d(TAG, "[P2P-DIAG] Already connected, ignoring redundant group formed info")
                 return
             }
 
-            Log.i(TAG, "P2P Group Formed. IsOwner=${info.isGroupOwner}, Owner=${info.groupOwnerAddress?.hostAddress}")
+            Log.i(TAG, "[P2P-DIAG] Group Formed! IsOwner=${info.isGroupOwner}, OwnerAddr=${info.groupOwnerAddress?.hostAddress}")
             _connectionState.value = ConnectionState.CONNECTING
             
             connectionAttemptJob?.cancel()
@@ -75,29 +80,26 @@ class WiFiDirectTransport(
                         if (info.isGroupOwner) {
                             startServer()
                         } else {
-                            val host = info.groupOwnerAddress?.hostAddress
-                            if (host != null) {
-                                startClient(host)
-                            } else {
-                                throw Exception("Group owner address unknown")
-                            }
+                            startClientWithRetry()
                         }
                     }
                 } catch (e: TimeoutCancellationException) {
-                    Log.e(TAG, "Socket connection timed out")
-                    _lastError.value = "Connection timed out"
+                    Log.e(TAG, "[P2P-DIAG] Socket connection attempt TIMED OUT after ${CONNECTION_TIMEOUT_MS}ms")
+                    _lastError.value = "Connection timed out (15s limit)"
                     _connectionState.value = ConnectionState.ERROR
+                    wifiDirectManager.updateSocketState(false)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Socket setup failed: ${e.message}", e)
+                    Log.e(TAG, "[P2P-DIAG] Socket setup failed: ${e.message}", e)
                     _lastError.value = e.message ?: "Socket connection failed"
                     _connectionState.value = ConnectionState.ERROR
+                    wifiDirectManager.updateSocketState(false)
                 }
             }
         }
     }
 
     override fun connect(targetId: String?) {
-        Log.i(TAG, "Connect requested. Target: ${targetId ?: "LISTEN"}")
+        Log.i(TAG, "[P2P-DIAG] Connect requested. Target: ${targetId ?: "LISTEN"}")
         _connectionState.value = ConnectionState.CONNECTING
         _lastError.value = null
         
@@ -106,13 +108,12 @@ class WiFiDirectTransport(
             if (peer != null) {
                 wifiDirectManager.connect(peer)
             } else {
-                Log.e(TAG, "Peer with address $targetId not found in discovered list")
+                Log.e(TAG, "[P2P-DIAG] Peer with address $targetId not found in discovered list")
                 _lastError.value = "Peer not found"
                 _connectionState.value = ConnectionState.ERROR
             }
         } else {
-            // As host, we just start discovery to be found
-            Log.d(TAG, "No target ID, starting discovery to wait for incoming connections")
+            Log.d(TAG, "[P2P-DIAG] No target ID, starting discovery to wait for incoming connections")
             wifiDirectManager.startDiscovery()
         }
     }
@@ -120,42 +121,56 @@ class WiFiDirectTransport(
     private suspend fun startServer() = withContext(Dispatchers.IO) {
         try {
             cleanupSockets()
-            Log.d(TAG, "Starting server socket on port $PORT...")
-            serverSocket = ServerSocket(PORT).apply { reuseAddress = true }
+            Log.i(TAG, "[P2P-DIAG] Socket attempt: Starting ServerSocket on port $PORT...")
+            serverSocket = ServerSocket(PORT).apply {
+                reuseAddress = true
+                soTimeout = 14000 // Just under the 15s overall timeout
+            }
             
-            // Wait for client to connect
+            Log.i(TAG, "[P2P-DIAG] ServerSocket listening, awaiting client connection...")
             val socket = serverSocket?.accept()
             if (socket != null && isActive) {
-                Log.i(TAG, "Accepted incoming connection from ${socket.inetAddress.hostAddress}")
+                Log.i(TAG, "[P2P-DIAG] Socket success: Accepted client connection from ${socket.inetAddress.hostAddress}")
                 setupConnection(socket)
             }
         } catch (e: Exception) {
             if (isActive) {
-                Log.e(TAG, "Server socket error", e)
+                Log.e(TAG, "[P2P-DIAG] Socket failure: ServerSocket error", e)
                 throw e
             }
         }
     }
 
-    private suspend fun startClient(host: String) = withContext(Dispatchers.IO) {
+    private suspend fun startClientWithRetry() = withContext(Dispatchers.IO) {
         cleanupSockets()
-        Log.d(TAG, "Connecting to server at $host:$PORT...")
-        
-        // Retry a few times as the server might not be ready yet
         var socket: Socket? = null
         var lastEx: Exception? = null
         
-        for (i in 1..10) {
+        Log.i(TAG, "[P2P-DIAG] Socket attempt: Client initiating connection to group owner...")
+
+        // Retry loop up to 12 attempts (~12 seconds)
+        for (attempt in 1..12) {
             if (!isActive) break
+            
+            val currentInfo = wifiDirectManager.connectionInfo.value
+            val host = currentInfo?.groupOwnerAddress?.hostAddress
+
+            if (host == null || host == "0.0.0.0") {
+                Log.d(TAG, "[P2P-DIAG] Group owner address not yet resolved (attempt $attempt/12), waiting...")
+                delay(1000L)
+                continue
+            }
+
             try {
+                Log.d(TAG, "[P2P-DIAG] Socket attempt $attempt/12 to $host:$PORT...")
                 socket = Socket()
                 socket.connect(InetSocketAddress(host, PORT), 2000)
-                Log.i(TAG, "Successfully connected to $host:$PORT on attempt $i")
+                Log.i(TAG, "[P2P-DIAG] Socket success: Connected to group owner at $host:$PORT on attempt $attempt")
                 break
             } catch (e: Exception) {
                 lastEx = e
-                Log.w(TAG, "Connection attempt $i failed: ${e.message}")
-                socket?.close()
+                Log.w(TAG, "[P2P-DIAG] Socket attempt $attempt failed: ${e.message}")
+                try { socket?.close() } catch (ignored: Exception) {}
                 socket = null
                 delay(1000L)
             }
@@ -164,7 +179,8 @@ class WiFiDirectTransport(
         if (socket != null && isActive) {
             setupConnection(socket)
         } else if (isActive) {
-            throw lastEx ?: Exception("Failed to connect to $host")
+            Log.e(TAG, "[P2P-DIAG] Socket failure: Could not connect to group owner")
+            throw lastEx ?: Exception("Failed to connect to group owner")
         }
     }
 
@@ -174,9 +190,10 @@ class WiFiDirectTransport(
         clientSocket = socket
         writer = PrintWriter(socket.getOutputStream(), true)
         
-        Log.i(TAG, "Transport connected. Socket: ${socket.inetAddress.hostAddress}")
+        Log.i(TAG, "[P2P-DIAG] Transport fully connected. Remote peer: ${socket.inetAddress.hostAddress}")
         _connectionState.value = ConnectionState.CONNECTED
         _lastError.value = null
+        wifiDirectManager.updateSocketState(true)
         
         startReceiving(socket)
     }
@@ -186,93 +203,93 @@ class WiFiDirectTransport(
         receiverJob = transportScope.launch {
             try {
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                Log.d(TAG, "Receiver thread started")
+                Log.d(TAG, "[P2P-DIAG] Receiver thread started")
                 while (isActive) {
                     val line = reader.readLine() ?: break
                     try {
                         val message = Json.decodeFromString<P2PMessage>(line)
                         onMessageReceived?.invoke(message)
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to parse incoming message: ${e.message}")
+                        Log.w(TAG, "[P2P-DIAG] Failed to parse incoming message: ${e.message}")
                     }
                 }
-                Log.i(TAG, "Receiver thread: connection closed by peer")
+                Log.i(TAG, "[P2P-DIAG] Receiver thread: Connection closed by peer")
             } catch (e: Exception) {
                 if (isActive) {
-                    Log.e(TAG, "Receiver error: ${e.message}")
-                    _lastError.value = "Connection lost"
-                    _connectionState.value = ConnectionState.ERROR
+                    Log.w(TAG, "[P2P-DIAG] Socket read error: ${e.message}")
                 }
             } finally {
-                if (isActive) {
-                    Log.d(TAG, "Receiver thread finished, disconnecting")
-                    disconnect()
-                }
+                disconnect()
             }
         }
     }
 
-    override fun getConnectedPeerId(): String? = clientSocket?.inetAddress?.hostAddress
+    override fun disconnect() {
+        Log.i(TAG, "[P2P-DIAG] Disconnect invoked on WiFiDirectTransport")
+        connectionAttemptJob?.cancel()
+        connectionAttemptJob = null
+        
+        cleanupSockets()
+        _connectionState.value = ConnectionState.DISCONNECTED
+        wifiDirectManager.updateSocketState(false)
+    }
+
+    private fun cleanupSockets() {
+        receiverJob?.cancel()
+        receiverJob = null
+        
+        try { writer?.close() } catch (ignored: Exception) {}
+        writer = null
+        
+        try { clientSocket?.close() } catch (ignored: Exception) {}
+        clientSocket = null
+        
+        try { serverSocket?.close() } catch (ignored: Exception) {}
+        serverSocket = null
+    }
+
+    fun release() {
+        disconnect()
+    }
 
     override fun sendMessage(message: P2PMessage) {
-        if (_connectionState.value != ConnectionState.CONNECTED || writer == null) {
-            Log.w(TAG, "Cannot send message: Not connected")
-            return
-        }
-        
-        transportScope.launch {
-            try {
-                val json = Json.encodeToString(message)
-                writer?.println(json)
-                Log.v(TAG, "Sent message ${message.messageId}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send message ${message.messageId}: ${e.message}")
-            }
-        }
+        send(message, null)
+    }
+
+    override fun getConnectedPeerId(): String? {
+        return clientSocket?.inetAddress?.hostAddress
     }
 
     override fun setOnMessageReceivedListener(callback: (P2PMessage) -> Unit) {
         this.onMessageReceived = callback
     }
 
-    override fun disconnect() {
-        Log.i(TAG, "Disconnecting WiFiDirectTransport...")
-        _connectionState.value = ConnectionState.DISCONNECTED
-        
-        connectionAttemptJob?.cancel()
-        connectionAttemptJob = null
-        
+    fun send(message: P2PMessage, onDeliveryStatus: ((DeliveryStatus) -> Unit)?) {
         transportScope.launch {
-            cleanupSockets()
-            wifiDirectManager.disconnect()
+            if (_connectionState.value != ConnectionState.CONNECTED || writer == null) {
+                Log.e(TAG, "[P2P-DIAG] Cannot send: Transport not connected")
+                onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
+                return@launch
+            }
+
+            try {
+                val json = Json.encodeToString(message)
+                writer?.println(json)
+                if (writer?.checkError() == true) {
+                    Log.e(TAG, "[P2P-DIAG] PrintWriter error occurred during send")
+                    onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
+                } else {
+                    Log.d(TAG, "[P2P-DIAG] Sent message successfully: id=${message.messageId}")
+                    onDeliveryStatus?.invoke(DeliveryStatus.DELIVERED)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[P2P-DIAG] Failed to send message: ${e.message}", e)
+                onDeliveryStatus?.invoke(DeliveryStatus.FAILED)
+            }
         }
     }
 
-    private fun cleanupSockets() {
-        Log.d(TAG, "Cleaning up sockets and streams")
-        receiverJob?.cancel()
-        receiverJob = null
-        try {
-            writer?.close()
-            clientSocket?.close()
-            serverSocket?.close()
-        } catch (e: Exception) {
-            Log.w(TAG, "Error during socket cleanup: ${e.message}")
-        } finally {
-            writer = null
-            clientSocket = null
-            serverSocket = null
-        }
-    }
-
-    fun release() {
-        Log.d(TAG, "Releasing WiFiDirectTransport resources")
-        connectionMonitorJob?.cancel()
-        transportScope.cancel()
-        disconnect()
-    }
-
-    companion object {
-        private const val TAG = "WiFiDirectTransport"
+    fun setMessageListener(listener: (P2PMessage) -> Unit) {
+        this.onMessageReceived = listener
     }
 }

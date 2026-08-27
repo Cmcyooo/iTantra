@@ -13,6 +13,14 @@ enum class ConnectionState {
 }
 
 /**
+ * Message delivery status indicator.
+ */
+enum class DeliveryStatus {
+    DELIVERED,
+    FAILED
+}
+
+/**
  * Abstraction for peer-to-peer communication.
  */
 interface Transport {

@@ -84,14 +84,28 @@ class GenericOnnxCtcSttEngine(
         if (samples.isEmpty()) return@withContext null
 
         try {
+            Log.i(TAG, "[STT-INFERENCE] language=${language.code} engine=VAKYANSH_WAV2VEC2 model=${language.modelAssetPath} vocab=${language.vocabOrTokensAssetPath} samples=${samples.size} sr=16000")
+
             val audioDuration = samples.size.toDouble() / 16000.0
             var decodedText = ""
+
+            // Zero-mean unit-variance acoustic normalization (Wav2Vec2 Hugging Face standard)
+            var sum = 0.0
+            for (s in samples) sum += s
+            val mean = (sum / samples.size).toFloat()
+            var sumSq = 0.0
+            for (s in samples) {
+                val diff = s - mean
+                sumSq += diff * diff
+            }
+            val std = kotlin.math.sqrt(sumSq / samples.size + 1e-7).toFloat()
+            val normalizedSamples = FloatArray(samples.size) { i -> (samples[i] - mean) / std }
 
             val processingTimeMs = measureTimeMillis {
                 val inputTensor = OnnxTensor.createTensor(
                     env,
-                    FloatBuffer.wrap(samples),
-                    longArrayOf(1, samples.size.toLong())
+                    FloatBuffer.wrap(normalizedSamples),
+                    longArrayOf(1, normalizedSamples.size.toLong())
                 )
 
                 val result = sess.run(mapOf("input_values" to inputTensor))
@@ -99,14 +113,15 @@ class GenericOnnxCtcSttEngine(
 
                 @Suppress("UNCHECKED_CAST")
                 val logits = outputTensor.value as Array<Array<FloatArray>>
-                decodedText = decodeCtc(logits)
+                val rawDecoded = decodeCtc(logits)
+                decodedText = IndicDomainNormalizer.normalize(rawDecoded, language.code)
 
                 inputTensor.close()
                 result.close()
             }
 
             val rtf = if (audioDuration > 0) (processingTimeMs / 1000.0) / audioDuration else 0.0
-            Log.d(TAG, "[${language.displayName}] Text: '$decodedText', Audio: ${"%.2f".format(audioDuration)}s, Latency: ${processingTimeMs}ms, RTF: ${"%.3f".format(rtf)}")
+            Log.d(TAG, "[${language.displayName}] Audio: ${"%.2f".format(audioDuration)}s, Latency: ${processingTimeMs}ms, RTF: ${"%.3f".format(rtf)}")
 
             SttResult(
                 text = decodedText,
@@ -160,11 +175,11 @@ class GenericOnnxCtcSttEngine(
         var prev = -1
         for (tid in predIds) {
             if (tid != prev) {
-                if (tid in vocab.indices && tid != padTokenId && tid != 0 && tid != 2 && tid != 3) {
+                if (tid in vocab.indices && tid != padTokenId) {
                     val token = vocab[tid]
                     if (token == "|") {
                         sb.append(" ")
-                    } else {
+                    } else if (!token.startsWith("<") && !token.startsWith("[") && token != "<s>" && token != "</s>" && token != "<unk>" && token != "[UNK]") {
                         sb.append(token)
                     }
                 }
@@ -202,7 +217,7 @@ class GenericOnnxCtcSttEngine(
             val id = json.getInt(token)
             map[id] = token
             if (id > maxId) maxId = id
-            if (token == "<pad>") padTokenId = id
+            if (token == "<pad>" || token == "[PAD]") padTokenId = id
         }
 
         val tokensArray = Array(maxId + 1) { "" }

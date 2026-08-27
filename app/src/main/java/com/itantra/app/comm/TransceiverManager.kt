@@ -68,8 +68,6 @@ class TransceiverManager(
     private var lastSentText: String = ""
     private var lastReceivedText: String = ""
     private var pendingAckAlertId: String? = null
-    
-    private var pttReleaseTime: Long = 0
 
     companion object {
         private const val TAG = "TransceiverManager"
@@ -133,19 +131,21 @@ class TransceiverManager(
         Log.i(TAG, "Transceiver mode switched to: ${if (enabled) "EMERGENCY" else "NORMAL"}")
     }
 
+    private var pttReleaseTime: Long = 0
+    private var sttStartTime: Long = 0
+    private var sttEndTime: Long = 0
+
     private fun updateStateFromAudio(state: AudioState) {
         when {
             state.sttStatus == SttStatus.TRANSCRIBING -> {
                 if (_uiState.value != TransceiverState.TRANSCRIBING) {
-                    val sttStartTime = System.currentTimeMillis()
-                    if (pttReleaseTime > 0) {
-                        Log.d(TAG, "Latency: PTT Release -> STT Start: ${sttStartTime - pttReleaseTime}ms")
-                    }
+                    sttStartTime = android.os.SystemClock.elapsedRealtime()
                     _uiState.value = TransceiverState.TRANSCRIBING
                 }
             }
             state.sttStatus == SttStatus.COMPLETE && state.recognizedText.isNotEmpty() -> {
                 if (state.recognizedText != lastSentText) {
+                    sttEndTime = android.os.SystemClock.elapsedRealtime()
                     lastSentText = state.recognizedText
                     if (_isEmergencyMode.value) {
                         sendRecognizedAlert(state.recognizedText)
@@ -184,15 +184,27 @@ class TransceiverManager(
 
     private fun sendRecognizedText(text: String) {
         scope.launch {
-            val sendStartTime = System.currentTimeMillis()
+            val sendStartTime = android.os.SystemClock.elapsedRealtime()
             _uiState.value = TransceiverState.FORWARDING
-            commManager.sendText(
+            val activeLang = audioManager.languageModelManager.currentLanguage.value.code
+            val sentMsg = commManager.sendText(
                 text = text,
-                language = audioManager.languageModelManager.currentLanguage.value.code,
+                language = activeLang,
                 senderName = callSignManager.getCallSign()
             )
-            val sendEndTime = System.currentTimeMillis()
-            Log.d(TAG, "Latency: STT End -> Network Send: ${sendEndTime - sendStartTime}ms")
+            val sendEndTime = android.os.SystemClock.elapsedRealtime()
+            
+            val pttToSttMs = if (pttReleaseTime > 0 && sttStartTime >= pttReleaseTime) "${sttStartTime - pttReleaseTime}ms" else "N/A"
+            val sttDurationMs = if (sttEndTime >= sttStartTime && sttStartTime > 0) "${sttEndTime - sttStartTime}ms" else "N/A"
+            val sttEndToSendStartMs = if (sttEndTime > 0) "${sendStartTime - sttEndTime}ms" else "N/A"
+            val sendDurationMs = "${sendEndTime - sendStartTime}ms"
+
+            Log.i(
+                TAG,
+                "[TELEMETRY-SENDER] utteranceId=${sentMsg.utteranceId} language=$activeLang STT_language=$activeLang " +
+                "PTT_RELEASE->STT_START=$pttToSttMs STT_START->STT_END=$sttDurationMs " +
+                "STT_END->SEND_START=$sttEndToSendStartMs SEND_START->SEND_COMPLETE=$sendDurationMs"
+            )
             
             _uiState.value = TransceiverState.SENT
             delay(1500.milliseconds) // Show "SENT" for a bit
@@ -204,7 +216,7 @@ class TransceiverManager(
 
     private fun sendRecognizedAlert(text: String) {
         scope.launch {
-            val sendStartTime = System.currentTimeMillis()
+            val sendStartTime = android.os.SystemClock.elapsedRealtime()
             _lastAlertText.value = text
             _uiState.value = TransceiverState.FORWARDING
             
@@ -216,14 +228,25 @@ class TransceiverManager(
             }
 
             _alertDeliveryStatus.value = AlertDeliveryStatus.SENDING
+            val activeLang = audioManager.languageModelManager.currentLanguage.value.code
             try {
                 val sentMsg = commManager.sendAlert(
                     text = text,
-                    language = audioManager.languageModelManager.currentLanguage.value.code,
+                    language = activeLang,
                     senderName = callSignManager.getCallSign()
                 )
-                val sendEndTime = System.currentTimeMillis()
-                Log.i(TAG, "🚨 Emergency alert dispatched to transport: ${sentMsg.messageId} in ${sendEndTime - sendStartTime}ms")
+                val sendEndTime = android.os.SystemClock.elapsedRealtime()
+                val pttToSttMs = if (pttReleaseTime > 0 && sttStartTime >= pttReleaseTime) "${sttStartTime - pttReleaseTime}ms" else "N/A"
+                val sttDurationMs = if (sttEndTime >= sttStartTime && sttStartTime > 0) "${sttEndTime - sttStartTime}ms" else "N/A"
+                val sttEndToSendStartMs = if (sttEndTime > 0) "${sendStartTime - sttEndTime}ms" else "N/A"
+                val sendDurationMs = "${sendEndTime - sendStartTime}ms"
+
+                Log.i(
+                    TAG,
+                    "[TELEMETRY-SENDER] utteranceId=${sentMsg.utteranceId} language=$activeLang STT_language=$activeLang " +
+                    "PTT_RELEASE->STT_START=$pttToSttMs STT_START->STT_END=$sttDurationMs " +
+                    "STT_END->SEND_START=$sttEndToSendStartMs SEND_START->SEND_COMPLETE=$sendDurationMs (EMERGENCY)"
+                )
                 
                 pendingAckAlertId = sentMsg.messageId
                 _alertDeliveryStatus.value = AlertDeliveryStatus.SENT
@@ -247,10 +270,6 @@ class TransceiverManager(
 
     private fun handleIncomingMessage(message: P2PMessage) {
         scope.launch {
-            val receiveTime = System.currentTimeMillis()
-            val transportLatency = receiveTime - message.timestamp
-            Log.d(TAG, "Incoming P2P message: ${message.text}. Sender: ${message.senderName}. Network Latency: ${transportLatency}ms")
-            
             // Update peer call sign mapping
             if (!message.senderName.isNullOrEmpty()) {
                 commManager.getConnectedPeerId()?.let { peerId ->
@@ -258,24 +277,16 @@ class TransceiverManager(
                 }
             }
             
-            // If it's just an identity exchange (empty text), don't process further
-            if (message.text.isEmpty()) return@launch
+            // If it's just an identity exchange (empty text) or an ACK packet, don't enqueue for playback
+            if (message.text.isEmpty() || message.messageType == P2PMessage.MESSAGE_TYPE_ACK) return@launch
 
             lastReceivedText = message.text
             _uiState.value = TransceiverState.RECEIVING
 
-            if (message.isAlert) {
-                Log.i(TAG, "🚨 Incoming HIGH-PRIORITY ALERT received: '${message.text}' from ${message.senderName}")
-                
-                // Immediately send ACK packet back to sender
-                commManager.sendAck(message.messageId, senderName = callSignManager.getCallSign())
-                
-                // Dispatch to AlertPlaybackManager
-                alertPlaybackManager.enqueueMessage(message)
-            } else {
-                // Route normal message through AlertPlaybackManager queue
-                alertPlaybackManager.enqueueMessage(message)
-            }
+            Log.d(TAG, "Incoming P2P message: utteranceId=${message.utteranceId} lang=${message.language} alert=${message.isAlert}")
+
+            // Dispatch to AlertPlaybackManager (it handles language propagation, TTS synthesis, and receiver telemetry)
+            alertPlaybackManager.enqueueMessage(message)
         }
     }
 
@@ -297,6 +308,7 @@ class TransceiverManager(
      * Start Push-to-Talk.
      */
     fun startTalk() {
+        Log.i(TAG, "[PTT-DIAG] PTT button pressed -> startTalk()")
         pttReleaseTime = 0
         audioManager.startRecording()
     }
@@ -305,7 +317,8 @@ class TransceiverManager(
      * Release Push-to-Talk.
      */
     fun stopTalk() {
-        pttReleaseTime = System.currentTimeMillis()
+        pttReleaseTime = android.os.SystemClock.elapsedRealtime()
+        Log.i(TAG, "[PTT-DIAG] PTT button released -> stopTalk()")
         audioManager.stopRecording(forceFinalize = true)
     }
 

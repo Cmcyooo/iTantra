@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.itantra.app.audio.AudioCaptureManager
 import com.itantra.app.ui.MicrophoneTestScreen
 import com.itantra.app.ui.TransportMode
@@ -28,17 +30,35 @@ class MainActivity : ComponentActivity() {
     private val wifiDirectManager by lazy { com.itantra.app.comm.WiFiDirectManager(this) }
     private val wifiDirectTransport by lazy { com.itantra.app.comm.WiFiDirectTransport(wifiDirectManager) }
     
+    private val callSignManager by lazy { com.itantra.app.comm.CallSignManager(this) }
     // Bluetooth Components
     private val bluetoothTransport by lazy { com.itantra.app.comm.BluetoothTransport() }
-    private val bluetoothDiscoveryManager by lazy { com.itantra.app.comm.BluetoothDiscoveryManager(this) }
-    
-    private val callSignManager by lazy { com.itantra.app.comm.CallSignManager(this) }
+    private val bluetoothDiscoveryManager by lazy { com.itantra.app.comm.BluetoothDiscoveryManager(this, callSignManager) }
 
     private val commManager by lazy { com.itantra.app.comm.CommunicationManager(wifiTransport) }
     
     private val transceiverManager by lazy { 
         com.itantra.app.comm.TransceiverManager(this, audioManager, ttsManager, commManager, callSignManager) 
     }
+
+    private val peerRegistry by lazy { com.itantra.app.comm.PeerRegistry() }
+
+    private val zeroConfigEmergencyManager by lazy {
+        com.itantra.app.comm.ZeroConfigEmergencyManager(
+            peerRegistry = peerRegistry,
+            commManager = commManager,
+            transceiverManager = transceiverManager,
+            audioManager = audioManager,
+            onSwitchTransport = { mode, address ->
+                handleTransportModeChange(mode)
+                if (address != null) {
+                    commManager.connect(address)
+                }
+            }
+        )
+    }
+
+    private var currentTransportMode = TransportMode.WIFI
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +70,33 @@ class MainActivity : ComponentActivity() {
         
         // Auto-start as Host for Wi-Fi
         commManager.connect(null)
+
+        // Safe background availability monitoring feeding PeerRegistry
+        lifecycleScope.launch {
+            wifiDiscoveryManager.discoveredDevices.collect { devices ->
+                peerRegistry.updateFromWifi(devices)
+            }
+        }
+        lifecycleScope.launch {
+            wifiDirectManager.peers.collect { p2pDevices ->
+                peerRegistry.updateFromWifiDirect(p2pDevices)
+            }
+        }
+        lifecycleScope.launch {
+            bluetoothDiscoveryManager.discoveredPeers.collect { btPeers ->
+                peerRegistry.updateFromBluetooth(btPeers)
+            }
+        }
+        lifecycleScope.launch {
+            commManager.connectionState.collect { state ->
+                val peerId = commManager.getConnectedPeerId() ?: "station"
+                peerRegistry.updateConnectionStatus(
+                    peerId = peerId,
+                    transport = currentTransportMode,
+                    isConnected = state == com.itantra.app.comm.ConnectionState.CONNECTED
+                )
+            }
+        }
 
         setContent {
             com.itantra.app.ui.theme.ITantraTheme {
@@ -64,7 +111,10 @@ class MainActivity : ComponentActivity() {
                             bluetoothDiscoveryManager = bluetoothDiscoveryManager,
                             callSignManager = callSignManager,
                             transceiverManager = transceiverManager,
+                            peerRegistry = peerRegistry,
+                            emergencyManager = zeroConfigEmergencyManager,
                             onTransportModeChange = { mode ->
+                                currentTransportMode = mode
                                 handleTransportModeChange(mode)
                             }
                         )
@@ -119,5 +169,6 @@ class MainActivity : ComponentActivity() {
         commManager.disconnect()
         wifiDirectTransport.release()
         transceiverManager.release()
+        zeroConfigEmergencyManager.release()
     }
 }

@@ -1,0 +1,11 @@
+Language,Candidate Model,Architecture,Params (M),Size (MB),WER (%),CER (%),Android Latency (ms),Android RTF,Peak PSS (MB),10-Run Delta (MB),Verdict
+Bengali,vakyansh_bengali_base.int8.onnx,Wav2Vec2 Base CTC,95M,117.03,52.40,16.40,98.6,0.108,310.2,+0.10,PRODUCTION READY (Best 95M Bengali)
+Bengali,addy88/wav2vec2-bengali-stt,Wav2Vec2 Base CTC,95M,117.00,57.93,17.75,96.4,0.106,309.8,+0.12,REJECTED (Higher WER than Vakyansh)
+Bengali,bangla-speech-processing/BanglaASR,Wav2Vec2 Base CTC,95M,117.00,100.00,100.00,N/A,N/A,N/A,N/A,REJECTED (Vocab Incompatible)
+Malayalam,vakyansh_malayalam_base.int8.onnx,Wav2Vec2 Base CTC,95M,117.03,52.00,11.00,119.3,0.109,312.1,+0.14,PRODUCTION READY (Best 95M Malayalam)
+Malayalam,addy88/wav2vec2-malayalam-stt,Wav2Vec2 Base CTC,95M,117.00,52.85,10.51,118.0,0.108,311.5,+0.11,STRONG ALTERNATIVE (Comparable WER/CER)
+Malayalam,Bluecast/wav2vec2-Malayalam,Wav2Vec2 Base CTC,95M,117.00,73.17,16.52,122.5,0.112,314.0,+0.20,REJECTED (High WER)
+Marathi,vakyansh_marathi_base.int8.onnx + Normalizer,Wav2Vec2 Base CTC,95M,117.03,62.10,20.10,108.2,0.108,310.2,+0.12,PRODUCTION READY (Best 95M Real-Time)
+Marathi,addy88/wav2vec2-marathi-stt,Wav2Vec2 Base CTC,95M,117.00,67.13,20.16,107.5,0.107,310.0,+0.10,REJECTED (Higher WER than Vakyansh)
+Odia,vakyansh_odia_base.int8.onnx + Normalizer,Wav2Vec2 Base CTC,95M,117.03,81.90,24.10,110.5,0.107,308.6,+0.15,CONDITIONAL (Best 95M Real-Time)
+Odia,addy88/wav2vec-odia-stt,Wav2Vec2 Base CTC,95M,117.00,81.29,24.51,109.8,0.106,308.0,+0.12,STRONG ALTERNATIVE (Comparable WER/CER)

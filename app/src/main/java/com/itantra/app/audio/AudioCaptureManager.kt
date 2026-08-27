@@ -57,6 +57,14 @@ class AudioCaptureManager(private val context: Context) {
     private val speechAccumulator = mutableListOf<FloatArray>()
     private var speechSamplesCount = 0
 
+    // Pre-speech circular buffer (~320ms at 16kHz) to guarantee first syllable is never truncated
+    private val preSpeechRingBuffer = java.util.ArrayDeque<FloatArray>()
+    private val PRE_SPEECH_MAX_CHUNKS = 10
+
+    // Accumulates audio samples during PTT hold for immediate fallback
+    private val pttAccumulator = mutableListOf<FloatArray>()
+    private var pttSamplesCount = 0
+
     // Standard 16 kHz, Mono, 16-bit PCM configuration
     val sampleRate = 16000
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -111,7 +119,7 @@ class AudioCaptureManager(private val context: Context) {
 
         try {
             val record = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 sampleRate,
                 channelConfig,
                 audioFormat,
@@ -138,6 +146,10 @@ class AudioCaptureManager(private val context: Context) {
             }
 
             audioRecord = record
+            speechAccumulator.clear()
+            speechSamplesCount = 0
+            pttAccumulator.clear()
+            pttSamplesCount = 0
             Log.d(TAG, "AudioRecord started. State: ${record.state}, RecordingState: ${record.recordingState}")
             _state.value = AudioState(
                 isRecording = true,
@@ -177,14 +189,16 @@ class AudioCaptureManager(private val context: Context) {
                     totalSamples += readCount
                     latestRms = calculateRms(buffer, readCount)
                     
-                    if (totalSamples < 5000) {
-                        Log.d(TAG, "First samples: ${buffer.take(10).joinToString()}, RMS: $latestRms")
-                    }
-                    
                     // Convert PCM16 chunk to Float for accumulation - Reuse buffer if possible
                     val floatChunk = FloatArray(readCount)
                     for (i in 0 until readCount) {
                         floatChunk[i] = buffer[i] / 32768.0f
+                    }
+
+                    // Always accumulate into pttAccumulator while PTT recording is active (max 30s)
+                    if (pttSamplesCount < sampleRate * 30) {
+                        pttAccumulator.add(floatChunk.copyOf())
+                        pttSamplesCount += floatChunk.size
                     }
 
                     // Process VAD with the float chunk we just converted
@@ -192,10 +206,6 @@ class AudioCaptureManager(private val context: Context) {
 
                     // Handle speech accumulation and STT triggering
                     handleSpeechTransitions(currentVadStatus, floatChunk)
-
-                    if (currentVadStatus != _state.value.vadStatus) {
-                        Log.d(TAG, "VAD Status Changed: $currentVadStatus")
-                    }
 
                     // Deliver PCM chunk to consumer (e.g., future VAD) without copying if possible
                     onAudioChunkCaptured?.invoke(buffer, readCount)
@@ -245,11 +255,30 @@ class AudioCaptureManager(private val context: Context) {
         Log.d(TAG, "stopRecording(forceFinalize=$forceFinalize)")
         _state.value = _state.value.copy(isRecording = false)
         
-        if (forceFinalize && speechAccumulator.isNotEmpty()) {
-            val speechData = flattenAccumulator()
+        if (forceFinalize) {
+            val audioToTranscribe = if (speechAccumulator.isNotEmpty() && speechSamplesCount >= sampleRate * 0.2) {
+                flattenAccumulator()
+            } else if (pttAccumulator.isNotEmpty() && pttSamplesCount >= sampleRate * 0.2) {
+                // User spoke briefly (>= 200ms) before VAD fired or during low volume
+                Log.i(TAG, "[PTT-DIAG] Finalizing from PTT rolling buffer ($pttSamplesCount samples)")
+                flattenPttAccumulator()
+            } else {
+                null
+            }
+
             speechAccumulator.clear()
             speechSamplesCount = 0
-            runStt(speechData)
+            pttAccumulator.clear()
+            pttSamplesCount = 0
+
+            if (audioToTranscribe != null) {
+                runStt(audioToTranscribe)
+            }
+        } else {
+            speechAccumulator.clear()
+            speechSamplesCount = 0
+            pttAccumulator.clear()
+            pttSamplesCount = 0
         }
 
         recordingJob?.cancel()
@@ -299,6 +328,15 @@ class AudioCaptureManager(private val context: Context) {
     private fun handleSpeechTransitions(vadStatus: VadStatus, floatChunk: FloatArray) {
         when (vadStatus) {
             VadStatus.SPEECH_DETECTED, VadStatus.SPEAKING -> {
+                if (speechSamplesCount == 0) {
+                    val preChunksCount = preSpeechRingBuffer.size
+                    Log.i(TAG, "[PTT-DIAG] Speech detected by VAD. Prepending $preChunksCount pre-speech chunks to preserve first syllable.")
+                    while (preSpeechRingBuffer.isNotEmpty()) {
+                        val pastChunk = preSpeechRingBuffer.removeFirst()
+                        speechAccumulator.add(pastChunk)
+                        speechSamplesCount += pastChunk.size
+                    }
+                }
                 // Limit to 30 seconds to prevent OOM
                 if (speechSamplesCount < sampleRate * 30) {
                     speechAccumulator.add(floatChunk.copyOf())
@@ -311,15 +349,25 @@ class AudioCaptureManager(private val context: Context) {
             }
             VadStatus.SPEECH_ENDED -> {
                 if (speechAccumulator.isNotEmpty()) {
+                    Log.i(TAG, "[PTT-DIAG] Speech endpoint reached (silence detected)")
                     val speechData = flattenAccumulator()
                     speechAccumulator.clear()
                     speechSamplesCount = 0
+                    preSpeechRingBuffer.clear()
+                    pttAccumulator.clear()
+                    pttSamplesCount = 0
                     
                     // Trigger STT in background
                     runStt(speechData)
                 }
             }
             VadStatus.SILENCE -> {
+                // Keep circular buffer of recent audio (~320ms) while waiting for speech
+                preSpeechRingBuffer.addLast(floatChunk.copyOf())
+                if (preSpeechRingBuffer.size > PRE_SPEECH_MAX_CHUNKS) {
+                    preSpeechRingBuffer.removeFirst()
+                }
+
                 if (_state.value.sttStatus != SttStatus.IDLE && _state.value.sttStatus != SttStatus.COMPLETE) {
                     // Reset to idle if we were expecting speech but got silence
                     _state.value = _state.value.copy(sttStatus = SttStatus.IDLE)
@@ -338,19 +386,34 @@ class AudioCaptureManager(private val context: Context) {
         return result
     }
 
+    private fun flattenPttAccumulator(): FloatArray {
+        val result = FloatArray(pttSamplesCount)
+        var offset = 0
+        for (chunk in pttAccumulator) {
+            chunk.copyInto(result, offset)
+            offset += chunk.size
+        }
+        return result
+    }
+
     private fun runStt(samples: FloatArray) {
         scope.launch {
+            Log.i(TAG, "[PTT-DIAG] STT transcription started (${samples.size} samples)")
+            val t0 = System.currentTimeMillis()
             _state.value = _state.value.copy(sttStatus = SttStatus.TRANSCRIBING)
             
             val result = sttManager?.transcribe(samples)
+            val elapsed = System.currentTimeMillis() - t0
             
             if (result != null) {
+                Log.i(TAG, "[PTT-DIAG] STT transcription ended in ${elapsed}ms: '${result.text.take(30)}...'")
                 _state.value = _state.value.copy(
                     sttStatus = SttStatus.COMPLETE,
                     recognizedText = result.text,
                     lastSttResult = result
                 )
             } else {
+                Log.w(TAG, "[PTT-DIAG] STT transcription returned null in ${elapsed}ms")
                 _state.value = _state.value.copy(sttStatus = SttStatus.ERROR)
             }
         }

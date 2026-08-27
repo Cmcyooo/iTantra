@@ -2,6 +2,8 @@ package com.itantra.app.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -53,6 +55,8 @@ fun MicrophoneTestScreen(
     bluetoothDiscoveryManager: BluetoothDiscoveryManager,
     callSignManager: CallSignManager,
     transceiverManager: TransceiverManager,
+    peerRegistry: PeerRegistry,
+    emergencyManager: ZeroConfigEmergencyManager,
     onTransportModeChange: (TransportMode) -> Unit
 ) {
     val context = LocalContext.current
@@ -67,14 +71,24 @@ fun MicrophoneTestScreen(
     val alertDeliveryStatus by transceiverManager.alertDeliveryStatus.collectAsState()
     val activeIncomingAlert by transceiverManager.activeIncomingAlert.collectAsState()
 
+    val registeredPeers by peerRegistry.peers.collectAsState()
+    val emergencyFlowState by emergencyManager.flowState.collectAsState()
+    val emergencyStatusText by emergencyManager.statusText.collectAsState()
+    val emergencyActivePeer by emergencyManager.activePeerName.collectAsState()
+    val emergencyActiveTransport by emergencyManager.activeTransport.collectAsState()
+
     val wifiDevices by discoveryManager.discoveredDevices.collectAsState()
     val isWifiSearching by discoveryManager.isSearching.collectAsState()
 
     val wifiDirectPeers by wifiDirectManager.peers.collectAsState()
     val isWifiDirectSearching by wifiDirectManager.isDiscoveryActive.collectAsState()
+    val isWifiDirectAvailable by wifiDirectManager.isAvailable.collectAsState()
+    val p2pStatusMessage by wifiDirectManager.statusMessage.collectAsState()
     
-    val bluetoothDevices by bluetoothDiscoveryManager.discoveredDevices.collectAsState()
+    val bluetoothPeers by bluetoothDiscoveryManager.discoveredPeers.collectAsState()
     val isBluetoothSearching by bluetoothDiscoveryManager.isSearching.collectAsState()
+    val isBluetoothEnabled by bluetoothDiscoveryManager.isBluetoothEnabled.collectAsState()
+    val bluetoothStatusMessage by bluetoothDiscoveryManager.statusMessage.collectAsState()
     
     var transportMode by remember { mutableStateOf(TransportMode.WIFI) }
     var showSettings by remember { mutableStateOf(false) }
@@ -132,12 +146,20 @@ fun MicrophoneTestScreen(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasWifiDirectPermission = permissions.values.all { it }
+        if (hasWifiDirectPermission) {
+            transportMode = TransportMode.WIFI_DIRECT
+            onTransportModeChange(TransportMode.WIFI_DIRECT)
+        }
     }
 
     val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasBluetoothPermission = permissions.values.all { it }
+        if (hasBluetoothPermission) {
+            transportMode = TransportMode.BLUETOOTH
+            onTransportModeChange(TransportMode.BLUETOOTH)
+        }
     }
 
     // --- CONNECTION FEEDBACK ---
@@ -158,8 +180,12 @@ fun MicrophoneTestScreen(
                 message = "Connection failed",
                 duration = SnackbarDuration.Short
             )
-            connectingDeviceName = null
-        } else if (commState == ConnectionState.DISCONNECTED) {
+        } else if (commState == ConnectionState.DISCONNECTED && connectingDeviceName != null) {
+            val prevDevice = connectingDeviceName
+            snackbarHostState.showSnackbar(
+                message = "Disconnected from $prevDevice",
+                duration = SnackbarDuration.Short
+            )
             connectingDeviceName = null
         }
     }
@@ -182,15 +208,58 @@ fun MicrophoneTestScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // --- HEADER ---
-            HeaderSection(commState, transportMode)
+            HeaderSection(
+                commState = commState,
+                transportMode = transportMode,
+                registeredPeers = registeredPeers,
+                isSearching = isWifiSearching || isWifiDirectSearching || isBluetoothSearching
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // --- EMERGENCY MODE SELECTOR ---
-            EmergencyModeSelector(
-                isEmergency = isEmergencyMode,
-                onModeChange = { transceiverManager.setEmergencyMode(it) }
-            )
+            if (!isEmergencyMode) {
+                // One-Touch Zero-Config Emergency Button
+                Button(
+                    onClick = {
+                        transceiverManager.setEmergencyMode(true)
+                        emergencyManager.triggerEmergency()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text("🚨 1-TOUCH HELP / EMERGENCY", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = Color.White)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // --- EMERGENCY MODE SELECTOR ---
+                EmergencyModeSelector(
+                    isEmergency = isEmergencyMode,
+                    onModeChange = { 
+                        transceiverManager.setEmergencyMode(it)
+                        if (it) emergencyManager.triggerEmergency()
+                    }
+                )
+            } else {
+                // --- ZERO-CONFIG EMERGENCY SECTION ---
+                ZeroConfigEmergencySection(
+                    emergencyFlowState = emergencyFlowState,
+                    statusText = emergencyStatusText,
+                    activePeer = emergencyActivePeer,
+                    activeTransport = emergencyActiveTransport,
+                    hasPermission = hasAudioPermission,
+                    onStartSpeech = { emergencyManager.startSpeechCapture() },
+                    onStopSpeech = { emergencyManager.stopSpeechCapture() },
+                    onRetry = { emergencyManager.triggerEmergency() },
+                    onCancel = { 
+                        emergencyManager.reset()
+                        transceiverManager.setEmergencyMode(false)
+                    },
+                    onRequestPermission = { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                )
+            }
 
             // --- INCOMING ALERT BANNER ---
             if (activeIncomingAlert != null) {
@@ -201,20 +270,22 @@ fun MicrophoneTestScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- LANGUAGE SELECTOR ---
-            LanguageSelectorSection(audioManager.languageModelManager)
+            LanguageSelectorSection(audioManager.languageModelManager, ttsManager)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- PTT CONTROL ---
-            PTTSection(
-                state = transceiverState,
-                isEmergencyMode = isEmergencyMode,
-                alertDeliveryStatus = alertDeliveryStatus,
-                hasPermission = hasAudioPermission,
-                onStartTalk = { transceiverManager.startTalk() },
-                onStopTalk = { transceiverManager.stopTalk() },
-                onRequestPermission = { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-            )
+            if (!isEmergencyMode) {
+                // --- NORMAL PTT CONTROL ---
+                PTTSection(
+                    state = transceiverState,
+                    isEmergencyMode = isEmergencyMode,
+                    alertDeliveryStatus = alertDeliveryStatus,
+                    hasPermission = hasAudioPermission,
+                    onStartTalk = { transceiverManager.startTalk() },
+                    onStopTalk = { transceiverManager.stopTalk() },
+                    onRequestPermission = { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -287,6 +358,7 @@ fun MicrophoneTestScreen(
                         DiscoverySection(
                             title = "Nearby Wi-Fi iTantra Devices",
                             commState = commState,
+                            connectingDeviceName = connectingDeviceName,
                             discoveredDevices = wifiDevices.map { 
                                 val savedCallSign = callSignManager.getPeerCallSign(it.ip)
                                 (savedCallSign ?: it.name) to it.ip 
@@ -306,41 +378,84 @@ fun MicrophoneTestScreen(
                     } else if (transportMode == TransportMode.WIFI_DIRECT) {
                         DiscoverySection(
                             title = "Nearby Wi-Fi Direct iTantra Devices",
+                            statusMessage = if (!hasWifiDirectPermission) "Nearby devices permission required"
+                                            else if (!isWifiDirectAvailable) "Wi-Fi Direct unavailable"
+                                            else p2pStatusMessage,
                             commState = commState,
+                            connectingDeviceName = connectingDeviceName,
                             discoveredDevices = wifiDirectPeers.map { 
                                 val savedCallSign = callSignManager.getPeerCallSign(it.deviceAddress)
-                                val baseName = if (it.deviceName.isNullOrEmpty()) "Direct Device" else it.deviceName
+                                val baseName = if (it.deviceName.isNullOrEmpty() || it.deviceName == "null") "Direct Device" else it.deviceName
                                 (savedCallSign ?: baseName) to it.deviceAddress 
                             },
                             isSearching = isWifiDirectSearching,
+                            emptyMessage = if (!hasWifiDirectPermission) "Nearby devices permission required"
+                                           else if (!isWifiDirectAvailable) "Wi-Fi Direct unavailable"
+                                           else if (isWifiDirectSearching) "Searching for nearby Wi-Fi Direct devices..."
+                                           else "No nearby Wi-Fi Direct devices found. Tap Rescan.",
                             onConnect = { name, address -> 
                                 connectingDeviceName = name
                                 commManager.disconnect()
                                 commManager.connect(address) 
                             },
-                            onDisconnect = { commManager.disconnect() },
+                            onDisconnect = { 
+                                commManager.disconnect()
+                                wifiDirectManager.disconnect()
+                            },
                             onRescan = {
                                 wifiDirectManager.stopDiscovery()
                                 wifiDirectManager.startDiscovery()
                             }
                         )
                     } else {
+                        if (!isBluetoothEnabled) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Bluetooth is turned off", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                        Text("Turn on Bluetooth to discover nearby devices", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE).apply {
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                // Ignored
+                                            }
+                                        }
+                                    ) {
+                                        Text("ENABLE")
+                                    }
+                                }
+                            }
+                        }
+
                         DiscoverySection(
                             title = "Nearby Bluetooth iTantra Devices",
+                            statusMessage = if (!hasBluetoothPermission) "Bluetooth permissions required"
+                                            else if (!isBluetoothEnabled) "Bluetooth is turned off"
+                                            else bluetoothStatusMessage,
                             commState = commState,
-                            discoveredDevices = bluetoothDevices.map { device ->
-                                @SuppressLint("MissingPermission")
-                                val systemName = device.name
-                                val savedCallSign = callSignManager.getPeerCallSign(device.address)
-                                
-                                val displayName = when {
-                                    !savedCallSign.isNullOrEmpty() -> savedCallSign
-                                    !systemName.isNullOrEmpty() -> systemName
-                                    else -> "iTantra Device"
-                                }
-                                displayName to device.address 
+                            connectingDeviceName = connectingDeviceName,
+                            discoveredDevices = bluetoothPeers.map { peer ->
+                                peer.displayName to peer.address 
                             },
                             isSearching = isBluetoothSearching,
+                            emptyMessage = if (!isBluetoothEnabled) "Bluetooth is turned off"
+                                           else if (isBluetoothSearching) "Searching for nearby Bluetooth devices..." 
+                                           else "No nearby Bluetooth iTantra devices found",
                             onConnect = { name, address -> 
                                 connectingDeviceName = name
                                 commManager.disconnect()
@@ -360,7 +475,12 @@ fun MicrophoneTestScreen(
 }
 
 @Composable
-fun HeaderSection(commState: ConnectionState, transportMode: TransportMode) {
+fun HeaderSection(
+    commState: ConnectionState,
+    transportMode: TransportMode,
+    registeredPeers: List<PeerEntry> = emptyList(),
+    isSearching: Boolean = false
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "iTantra",
@@ -432,6 +552,308 @@ fun HeaderSection(commState: ConnectionState, transportMode: TransportMode) {
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+
+        // Pre-Emergency Readiness Badge
+        val reachablePeer = registeredPeers.firstOrNull()
+        Surface(
+            shape = CircleShape,
+            color = when {
+                commState == ConnectionState.CONNECTED -> Color(0xFF4CAF50).copy(alpha = 0.15f)
+                reachablePeer != null -> Color(0xFF4CAF50).copy(alpha = 0.15f)
+                isSearching -> Color(0xFFFFC107).copy(alpha = 0.15f)
+                else -> Color(0xFFF44336).copy(alpha = 0.15f)
+            },
+            modifier = Modifier.padding(top = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = when {
+                        commState == ConnectionState.CONNECTED -> "🟢 Ready"
+                        reachablePeer != null -> "🟢 Ready • Reachable: ${reachablePeer.displayName}"
+                        isSearching -> "🟡 Searching for nearby iTantra devices..."
+                        else -> "🔴 Searching for nearby iTantra devices..."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        commState == ConnectionState.CONNECTED || reachablePeer != null -> Color(0xFF2E7D32)
+                        isSearching -> Color(0xFFF57F17)
+                        else -> Color(0xFFC62828)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ZeroConfigEmergencySection(
+    emergencyFlowState: EmergencyFlowState,
+    statusText: String,
+    activePeer: String?,
+    activeTransport: TransportMode?,
+    hasPermission: Boolean,
+    onStartSpeech: () -> Unit,
+    onStopSpeech: () -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    onRequestPermission: () -> Unit
+) {
+    val isPressed = emergencyFlowState == EmergencyFlowState.LISTENING
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A0F0F)),
+        border = BorderStroke(2.dp, Color(0xFFD32F2F))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "🚨 EMERGENCY MODE",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF5252)
+                )
+                TextButton(onClick = onCancel) {
+                    Text("EXIT", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // State Badge
+            Surface(
+                shape = CircleShape,
+                color = when (emergencyFlowState) {
+                    EmergencyFlowState.DELIVERED -> Color(0xFF4CAF50).copy(alpha = 0.2f)
+                    EmergencyFlowState.READY -> Color(0xFF4CAF50).copy(alpha = 0.2f)
+                    EmergencyFlowState.FAILED -> Color(0xFFF44336).copy(alpha = 0.2f)
+                    else -> Color(0xFFFFC107).copy(alpha = 0.2f)
+                }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (emergencyFlowState) {
+                                    EmergencyFlowState.DELIVERED -> Color(0xFF4CAF50)
+                                    EmergencyFlowState.READY -> Color(0xFF4CAF50)
+                                    EmergencyFlowState.FAILED -> Color(0xFFF44336)
+                                    else -> Color(0xFFFFC107)
+                                }
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = when (emergencyFlowState) {
+                            EmergencyFlowState.IDLE -> "IDLE"
+                            EmergencyFlowState.SEARCHING -> "FINDING NEAREST DEVICE..."
+                            EmergencyFlowState.SELECTING_PEER -> "SELECTING PEER..."
+                            EmergencyFlowState.CONNECTING -> "CONNECTING..."
+                            EmergencyFlowState.READY -> "READY"
+                            EmergencyFlowState.LISTENING -> "RECORDING SPEECH..."
+                            EmergencyFlowState.PROCESSING -> "PROCESSING SPEECH..."
+                            EmergencyFlowState.SENDING -> "TRANSMITTING ALERT..."
+                            EmergencyFlowState.WAITING_FOR_ACK -> "WAITING FOR ACK..."
+                            EmergencyFlowState.DELIVERED -> "ALERT DELIVERED ✓"
+                            EmergencyFlowState.FAILED -> "ALERT NOT DELIVERED"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Peer & Transport Metadata
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Station", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(
+                        text = activePeer ?: "Searching...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Transport", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(
+                        text = when (activeTransport) {
+                            TransportMode.WIFI -> "Local Wi-Fi"
+                            TransportMode.WIFI_DIRECT -> "Wi-Fi Direct"
+                            TransportMode.BLUETOOTH -> "Bluetooth"
+                            null -> "Auto-detect"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action section according to state
+            when (emergencyFlowState) {
+                EmergencyFlowState.SEARCHING, EmergencyFlowState.SELECTING_PEER, EmergencyFlowState.CONNECTING -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFFF5252),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(statusText, color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                EmergencyFlowState.READY, EmergencyFlowState.LISTENING -> {
+                    // Big Push-to-Talk Button
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .clip(CircleShape)
+                            .background(if (isPressed) Color(0xFF880E4F) else Color(0xFFD32F2F))
+                            .pointerInput(hasPermission) {
+                                if (!hasPermission) return@pointerInput
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (event.type == PointerEventType.Press) {
+                                            onStartSpeech()
+                                        } else if (event.type == PointerEventType.Release) {
+                                            onStopSpeech()
+                                        }
+                                    }
+                                }
+                            }
+                            .then(if (!hasPermission) Modifier.clickable { onRequestPermission() } else Modifier),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Emergency Mic",
+                                tint = Color.White,
+                                modifier = Modifier.size(56.dp)
+                            )
+                            Text(
+                                text = if (isPressed) "RECORDING" else "HOLD TO SPEAK",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (isPressed) "Keep holding while speaking emergency message..." else "Release to transmit high-priority alert",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.LightGray
+                    )
+                }
+                EmergencyFlowState.PROCESSING, EmergencyFlowState.SENDING, EmergencyFlowState.WAITING_FOR_ACK -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFFFC107),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(statusText, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Waiting for receiver acknowledgement...", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                EmergencyFlowState.DELIVERED -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "✅",
+                            fontSize = 48.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "ALERT DELIVERED ✓",
+                            color = Color(0xFF4CAF50),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "${activePeer ?: "Receiver"} acknowledged receipt",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = onRetry,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                        ) {
+                            Text("SEND ANOTHER ALERT")
+                        }
+                    }
+                }
+                EmergencyFlowState.FAILED -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "⚠️",
+                            fontSize = 48.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "ALERT NOT DELIVERED",
+                            color = Color(0xFFF44336),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = statusText,
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = onRetry,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                            ) {
+                                Text("RETRY")
+                            }
+                            OutlinedButton(onClick = onCancel) {
+                                Text("RETURN TO NORMAL", color = Color.White)
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    ) {
+                        Text("🚨 START EMERGENCY CONNECTION", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
@@ -549,14 +971,13 @@ fun PTTSection(
         Text(
             text = when (state) {
                 TransceiverState.IDLE -> if (isEmergencyMode) "READY (ALERT)" else "READY"
-                TransceiverState.LISTENING -> if (isEmergencyMode) "RECORDING ALERT..." else "LISTENING..."
-                TransceiverState.SPEAKING -> if (isEmergencyMode) "RECORDING ALERT..." else "SPEAKING..."
-                TransceiverState.TRANSCRIBING -> "TRANSCRIBING..."
-                TransceiverState.FORWARDING -> if (isEmergencyMode) "BROADCASTING ALERT..." else "FORWARDING..."
+                TransceiverState.LISTENING -> if (isEmergencyMode) "RECORDING ALERT..." else "RECORDING..."
+                TransceiverState.SPEAKING -> if (isEmergencyMode) "RECORDING ALERT..." else "RECORDING..."
+                TransceiverState.TRANSCRIBING, TransceiverState.FORWARDING -> "PROCESSING..."
                 TransceiverState.SENT -> if (isEmergencyMode) "ALERT SENT ✅" else "SENT ✅"
                 TransceiverState.RECEIVING -> "RECEIVING..."
                 TransceiverState.PLAYING -> "🔊 PLAYING"
-                TransceiverState.ERROR -> "ERROR"
+                TransceiverState.ERROR -> "FAILED"
             },
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
@@ -565,6 +986,7 @@ fun PTTSection(
                 state == TransceiverState.LISTENING || state == TransceiverState.SPEAKING -> MaterialTheme.colorScheme.error
                 state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
                 state == TransceiverState.SENT -> Color(0xFF4CAF50)
+                state == TransceiverState.ERROR -> MaterialTheme.colorScheme.error
                 else -> MaterialTheme.colorScheme.primary
             }
         )
@@ -612,12 +1034,30 @@ fun PTTSection(
         Text(
             text = when {
                 !hasPermission -> "Tap to grant permission"
-                isEmergencyMode -> "HOLD TO BROADCAST ALERT"
-                else -> "HOLD TO TALK"
+                isPressed -> "[ RELEASE TO SEND ]"
+                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> "[ PROCESSING... ]"
+                state == TransceiverState.SENT -> "[ SENT ✓ ]"
+                state == TransceiverState.ERROR -> "[ FAILED ]"
+                isEmergencyMode -> "[ BROADCAST ALERT ]"
+                else -> "[ TALK ]"
             },
-            style = MaterialTheme.typography.labelLarge,
-            color = if (isEmergencyMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (isEmergencyMode) FontWeight.Bold else FontWeight.Normal
+            style = MaterialTheme.typography.titleMedium,
+            color = when {
+                isPressed -> MaterialTheme.colorScheme.error
+                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
+                state == TransceiverState.SENT -> Color(0xFF4CAF50)
+                state == TransceiverState.ERROR -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.primary
+            },
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = if (isPressed) "Keep holding while speaking..." else "Press and hold to transmit speech",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -713,9 +1153,12 @@ fun PerformanceSection(audioState: AudioState, ttsManager: TtsManager, commManag
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            PerformanceItem("STT", "${audioState.lastSttResult?.processingTimeMs ?: 0}ms")
-            PerformanceItem("Net", "${commLatency ?: 0}ms")
-            PerformanceItem("TTS", "${ttsResult?.synthesisTimeMs ?: 0}ms")
+            val sttText = audioState.lastSttResult?.processingTimeMs?.takeIf { it > 0 }?.let { "${it}ms" } ?: "N/A"
+            val netText = commLatency?.takeIf { it > 0 }?.let { "${it}ms" } ?: "N/A"
+            val ttsText = ttsResult?.synthesisTimeMs?.takeIf { it > 0 }?.let { "${it}ms" } ?: "N/A"
+            PerformanceItem("STT", sttText)
+            PerformanceItem("Net RTT", netText)
+            PerformanceItem("TTS", ttsText)
         }
     }
 }
@@ -793,9 +1236,12 @@ fun TransportSelector(currentMode: TransportMode, onModeChange: (TransportMode) 
 @Composable
 fun DiscoverySection(
     title: String,
+    statusMessage: String? = null,
     commState: ConnectionState,
+    connectingDeviceName: String? = null,
     discoveredDevices: List<Pair<String, String>>,
     isSearching: Boolean,
+    emptyMessage: String? = null,
     onConnect: (String, String) -> Unit,
     onDisconnect: () -> Unit,
     onRescan: () -> Unit
@@ -812,7 +1258,7 @@ fun DiscoverySection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             if (isSearching) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Scanning...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
@@ -824,26 +1270,38 @@ fun DiscoverySection(
                     "Ready (Rescan)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onRescan() }
                 )
             }
+        }
+
+        if (!statusMessage.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = statusMessage,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
         
         Spacer(modifier = Modifier.height(12.dp))
         
         if (discoveredDevices.isEmpty()) {
             Text(
-                if (isSearching) "Searching for nearby devices..." else "No nearby iTantra devices found.",
+                text = emptyMessage ?: if (isSearching) "Searching for nearby devices..." else "No nearby iTantra devices found.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {
             discoveredDevices.forEach { (name, address) ->
+                val isConnectingToThis = (connectingDeviceName == name)
                 DeviceItem(
                     name = name,
                     address = address,
                     commState = commState,
+                    isConnectingToThis = isConnectingToThis,
                     onConnect = { onConnect(name, address) }
                 )
             }
@@ -856,7 +1314,7 @@ fun DiscoverySection(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
-                Text("DISCONNECT")
+                Text("DISCONNECT", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -867,6 +1325,7 @@ fun DeviceItem(
     name: String,
     address: String,
     commState: ConnectionState,
+    isConnectingToThis: Boolean,
     onConnect: () -> Unit
 ) {
     Card(
@@ -899,15 +1358,20 @@ fun DeviceItem(
             
             Button(
                 onClick = onConnect,
-                enabled = commState == ConnectionState.DISCONNECTED,
-                colors = if (commState == ConnectionState.CONNECTED) 
-                            ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-                         else ButtonDefaults.buttonColors()
+                enabled = commState == ConnectionState.DISCONNECTED || (commState == ConnectionState.ERROR && isConnectingToThis),
+                colors = when {
+                    isConnectingToThis && commState == ConnectionState.CONNECTED -> 
+                        ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    isConnectingToThis && commState == ConnectionState.ERROR ->
+                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    else -> ButtonDefaults.buttonColors()
+                }
             ) {
                 Text(
-                    text = when(commState) {
-                        ConnectionState.CONNECTING -> "CONNECTING..."
-                        ConnectionState.CONNECTED -> "CONNECTED ✓"
+                    text = when {
+                        isConnectingToThis && commState == ConnectionState.CONNECTING -> "CONNECTING..."
+                        isConnectingToThis && commState == ConnectionState.CONNECTED -> "CONNECTED ✓"
+                        isConnectingToThis && commState == ConnectionState.ERROR -> "CONNECTION FAILED"
                         else -> "CONNECT"
                     }
                 )
@@ -918,9 +1382,13 @@ fun DeviceItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageSelectorSection(languageModelManager: LanguageModelManager) {
+fun LanguageSelectorSection(
+    languageModelManager: LanguageModelManager,
+    ttsManager: com.itantra.app.audio.TtsManager
+) {
     val currentLang by languageModelManager.currentLanguage.collectAsState()
     val lifecycleState by languageModelManager.lifecycleState.collectAsState()
+    val ttsLifecycleState by ttsManager.languageTtsManager.lifecycleState.collectAsState()
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
 
@@ -935,25 +1403,29 @@ fun LanguageSelectorSection(languageModelManager: LanguageModelManager) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Speech Language",
+                    text = "Speech & TTS Language",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                val statusText = when (lifecycleState) {
-                    ModelLifecycleState.UNLOADED -> "Idle"
-                    ModelLifecycleState.LOADING -> "Loading ${currentLang.displayName}..."
-                    ModelLifecycleState.RELEASING -> "Releasing..."
-                    ModelLifecycleState.READY -> "Ready"
-                    ModelLifecycleState.TRANSCRIBING -> "Transcribing..."
-                    ModelLifecycleState.FAILED -> "Failed"
+                val isLoading = lifecycleState == ModelLifecycleState.LOADING || 
+                                lifecycleState == ModelLifecycleState.RELEASING ||
+                                ttsLifecycleState == ModelLifecycleState.LOADING || 
+                                ttsLifecycleState == ModelLifecycleState.RELEASING
+
+                val statusText = when {
+                    isLoading -> "Loading ${currentLang.displayName}..."
+                    lifecycleState == ModelLifecycleState.TRANSCRIBING -> "Transcribing..."
+                    lifecycleState == ModelLifecycleState.READY && ttsLifecycleState == ModelLifecycleState.READY -> "Ready"
+                    lifecycleState == ModelLifecycleState.FAILED || ttsLifecycleState == ModelLifecycleState.FAILED -> "Error"
+                    else -> "Idle"
                 }
 
-                val statusColor = when (lifecycleState) {
-                    ModelLifecycleState.READY -> Color(0xFF4CAF50)
-                    ModelLifecycleState.LOADING, ModelLifecycleState.RELEASING -> Color(0xFFFF9800)
-                    ModelLifecycleState.TRANSCRIBING -> Color(0xFF2196F3)
-                    ModelLifecycleState.FAILED -> MaterialTheme.colorScheme.error
+                val statusColor = when {
+                    statusText == "Ready" -> Color(0xFF4CAF50)
+                    isLoading -> Color(0xFFFF9800)
+                    lifecycleState == ModelLifecycleState.TRANSCRIBING -> Color(0xFF2196F3)
+                    statusText == "Error" -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
 
@@ -967,12 +1439,21 @@ fun LanguageSelectorSection(languageModelManager: LanguageModelManager) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val currentVoiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(currentLang)
+            val readinessTag = if (currentVoiceConfig.isProductionReady) "Ready" else "Conditional"
+
             ExposedDropdownMenuBox(
                 expanded = expanded,
-                onExpandedChange = { if (lifecycleState != ModelLifecycleState.LOADING && lifecycleState != ModelLifecycleState.RELEASING) expanded = !expanded }
+                onExpandedChange = { 
+                    val isLoading = lifecycleState == ModelLifecycleState.LOADING || 
+                                    lifecycleState == ModelLifecycleState.RELEASING ||
+                                    ttsLifecycleState == ModelLifecycleState.LOADING || 
+                                    ttsLifecycleState == ModelLifecycleState.RELEASING
+                    if (!isLoading) expanded = !expanded 
+                }
             ) {
                 OutlinedTextField(
-                    value = "${currentLang.displayName} (${currentLang.nativeName})",
+                    value = "${currentLang.displayName} (${currentLang.nativeName}) — $readinessTag",
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -988,18 +1469,33 @@ fun LanguageSelectorSection(languageModelManager: LanguageModelManager) {
                     onDismissRequest = { expanded = false }
                 ) {
                     SupportedLanguage.values().forEach { lang ->
+                        val voiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(lang)
+                        val tag = if (voiceConfig.isProductionReady) "Ready" else "Conditional"
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    text = "${lang.displayName} (${lang.nativeName})",
-                                    fontWeight = if (lang == currentLang) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${lang.displayName} (${lang.nativeName})",
+                                        fontWeight = if (lang == currentLang) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = tag,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (voiceConfig.isProductionReady) Color(0xFF4CAF50) else Color(0xFFFF9800),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             },
                             onClick = {
                                 expanded = false
                                 if (lang != currentLang) {
                                     scope.launch {
                                         languageModelManager.setLanguage(lang)
+                                        ttsManager.languageTtsManager.setLanguage(lang)
                                     }
                                 }
                             }

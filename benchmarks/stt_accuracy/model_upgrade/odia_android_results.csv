@@ -1,0 +1,4 @@
+Candidate Model,Architecture,Params (M),Size (MB),Quantization,Desktop RTF,Android Latency (ms),Android RTF,Peak PSS (MB),RAM Delta (MB),WER (%),CER (%),Stability,Mobile Score,Classification
+vakyansh_odia_base.int8.onnx,Wav2Vec2 Base CTC,95M,117.03,Dynamic INT8,0.163,110.5,0.107,308.6,+0.15,85.60,25.30,Zero crashes,41.95,CONDITIONAL (Mobile Real-Time)
+odia_large.int8.onnx (Harveenchadha),Wav2Vec2 Large CTC,315M,340.69,Dynamic INT8,0.268,3312.4,1.104,911.5,+1.20,71.22,19.70,Zero crashes,23.27,CONDITIONAL (Desktop/NPU Only - RTF > 1.0)
+anuragshas/wav2vec2-large-xlsr-53-odia,Wav2Vec2 Large XLSR-53 CTC,315M,1200.00,FP32,0.205,N/A,N/A,N/A,N/A,100.00,43.87,N/A,0.00,REJECTED (Token Slash Delimiters)

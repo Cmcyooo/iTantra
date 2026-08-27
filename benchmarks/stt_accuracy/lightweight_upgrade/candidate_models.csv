@@ -1,0 +1,15 @@
+Language,Candidate Model ID,Architecture,Parameters (M),Quantization,License,HF Downloads,Expected Feasibility
+Bengali,bangla-speech-processing/BanglaASR,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,15090,High (Most popular open Bengali ASR)
+Bengali,ai4bharat/indicwav2vec_v1_bengali,IndicWav2Vec Base CTC,95M,Dynamic INT8 ONNX,MIT / CC-BY,93,High (AI4Bharat Indic dataset)
+Bengali,addy88/wav2vec2-bengali-stt,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,25,High (Standard CTC head)
+Bengali,Harveenchadha/vakyansh-wav2vec2-bengali-bnm-200,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,MIT,686,Baseline (52.40% WER)
+Malayalam,Bluecast/wav2vec2-Malayalam,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,8,High (Clean tokenizer)
+Malayalam,addy88/wav2vec2-malayalam-stt,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,12,High (Standard CTC head)
+Malayalam,mohamed-illiyas/wav2vec-malayalam-new,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,10,High (Fine-tuned Malayalam)
+Malayalam,Harveenchadha/vakyansh-wav2vec2-malayalam-mlm-8,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,MIT,148,Baseline (52.00% WER)
+Marathi,addy88/wav2vec2-marathi-stt,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,29,High (Standard CTC head)
+Marathi,StephennFernandes/XLS-R-marathi,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,10,Medium
+Marathi,Harveenchadha/vakyansh-wav2vec2-marathi-mrm-100,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,MIT,158,Baseline (62.10% WER)
+Odia,addy88/wav2vec-odia-stt,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,Apache 2.0,13,High (Standard CTC head)
+Odia,ai4bharat/indicwav2vec-odia,IndicWav2Vec Base CTC,95M,Dynamic INT8 ONNX,MIT / CC-BY,41,High (AI4Bharat Odia corpus)
+Odia,Harveenchadha/vakyansh-wav2vec2-odia-orm-100,Wav2Vec2 Base CTC,95M,Dynamic INT8 ONNX,MIT,32,Baseline (81.90% WER)

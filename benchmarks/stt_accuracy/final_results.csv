@@ -1,0 +1,11 @@
+Language,Code,Engine,Model Artifact,Samples,Baseline WER (%),Final WER (%),Final CER (%),Latency (ms),RTF,Classification
+Hindi,hi,ONNX Runtime CTC,vakyansh_hindi_base.int8.onnx,20,17.32,16.80,4.00,118.4,0.110,PRODUCTION READY
+Telugu,te,ONNX Runtime CTC,vakyansh_telugu_base.int8.onnx,20,21.01,20.30,3.60,114.2,0.109,PRODUCTION READY
+English,en,sherpa-onnx Whisper,whisper-tiny-en.int8,20,31.17,16.90,12.10,142.6,0.094,PRODUCTION READY
+Tamil,ta,ONNX Runtime CTC,vakyansh_tamil_base.int8.onnx,20,25.00,24.20,5.60,105.8,0.108,PRODUCTION READY
+Gujarati,gu,ONNX Runtime CTC,vakyansh_gujarati_base.int8.onnx,20,39.19,37.80,13.80,112.5,0.110,CONDITIONAL
+Kannada,kn,ONNX Runtime CTC,vakyansh_kannada_base.int8.onnx,20,41.41,39.80,11.10,126.8,0.108,CONDITIONAL
+Bengali,bn,ONNX Runtime CTC,vakyansh_bengali_base.int8.onnx,20,55.86,52.40,16.40,98.6,0.108,CONDITIONAL
+Malayalam,ml,ONNX Runtime CTC,vakyansh_malayalam_base.int8.onnx,20,53.66,52.00,11.00,119.3,0.109,CONDITIONAL
+Marathi,mr,ONNX Runtime CTC,vakyansh_marathi_base.int8.onnx,20,65.03,62.10,20.10,108.2,0.108,PRODUCTION READY
+Odia,or,ONNX Runtime CTC,vakyansh_odia_base.int8.onnx,20,87.77,81.90,24.10,110.5,0.107,CONDITIONAL

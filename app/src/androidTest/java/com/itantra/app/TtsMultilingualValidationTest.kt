@@ -89,6 +89,14 @@ class TtsMultilingualValidationTest {
             Pair("numbers", "संघामध्ये एकूण बारा सदस्य आहेत, बॅटरी पातळी पंच्याहत्तर टक्के आहे."),
             Pair("short", "रेडिओ चेक, माझा आवाज तुम्हाला स्पष्ट येत आहे का?")
         )
+
+        val ODIA_PHRASES = listOf(
+            Pair("emergency_1", "ଜରୁରୀ ସତର୍କତା, ଚାରି ନମ୍ବର ସେକ୍ଟରରେ ତୁରନ୍ତ ସାହାଯ୍ୟ ଆବଶ୍ୟକ।"),
+            Pair("emergency_2", "ରେଡ୍ ଆଲର୍ଟ, ସମସ୍ତ ଦଳ ସଦସ୍ୟ ତୁରନ୍ତ ସୁରକ୍ଷିତ ସ୍ଥାନକୁ ଯାଆନ୍ତୁ।"),
+            Pair("location", "ଆମେ ଷ୍ଟେସନ ଆଲଫାରେ ଅଛୁ, ମୁଖ୍ୟ ଫାଟକରୁ ପଚାଶ ମିଟର ଉତ୍ତରକୁ।"),
+            Pair("numbers", "ଦଳରେ ମୋଟ ବାର ଜଣ ସଦସ୍ୟ ଅଛନ୍ତି, ବ୍ୟାଟେରୀ ସ୍ତର ପଞ୍ଚସ୍ତରୀ ପ୍ରତିଶତ।"),
+            Pair("short", "ରେଡିଓ ଯାଞ୍ଚ, ମୋର ସ୍ୱର ଆପଣଙ୍କୁ ସ୍ପଷ୍ଟ ଶୁଣାଯାଉଛି କି?")
+        )
     }
 
     private lateinit var context: Context
@@ -398,6 +406,16 @@ class TtsMultilingualValidationTest {
             modelDirName = "mms_mar",
             isPiper = false,
             phrases = MARATHI_PHRASES
+        )
+    }
+
+    @Test
+    fun test19_BenchmarkMetaMmsOdia() {
+        runModelBenchmark(
+            modelTag = "mms_ory",
+            modelDirName = "mms_ory",
+            isPiper = false,
+            phrases = ODIA_PHRASES
         )
     }
 }

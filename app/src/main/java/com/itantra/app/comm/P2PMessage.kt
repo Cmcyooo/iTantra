@@ -14,7 +14,8 @@ data class P2PMessage(
     val text: String,
     val senderName: String? = null,
     val messageType: String = MESSAGE_TYPE_NORMAL,
-    val priority: String = PRIORITY_NORMAL
+    val priority: String = PRIORITY_NORMAL,
+    val utteranceId: String = messageId
 ) {
     companion object {
         const val MESSAGE_TYPE_NORMAL = "NORMAL"

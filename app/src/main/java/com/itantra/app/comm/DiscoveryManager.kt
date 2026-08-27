@@ -38,7 +38,7 @@ class DiscoveryManager(private val context: Context) {
         val name: String,
         val ip: String,
         val port: Int,
-        val serviceInfo: NsdServiceInfo
+        val serviceInfo: NsdServiceInfo? = null
     )
 
     fun startAdvertising(deviceName: String = Build.MODEL) {
@@ -171,7 +171,7 @@ class DiscoveryManager(private val context: Context) {
     private fun removeDevice(serviceName: String) {
         val nameToMatch = serviceName.removePrefix(SERVICE_NAME_PREFIX)
         val currentList = _discoveredDevices.value.toMutableList()
-        if (currentList.removeIf { it.name == nameToMatch || it.serviceInfo.serviceName == serviceName }) {
+        if (currentList.removeIf { it.name == nameToMatch || it.serviceInfo?.serviceName == serviceName }) {
             _discoveredDevices.value = currentList
         }
     }
