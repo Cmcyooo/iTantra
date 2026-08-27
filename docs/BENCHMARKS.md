@@ -325,3 +325,127 @@
 * **Audio Track Leaks**: **0** (Track buffers cleanly released on marker update)
 * **Audio Focus Leaks**: **0** (Abandoned automatically upon alert completion)
 * **Stability**: **0 crashes, 0 ANRs, 0 native crashes (SIGSEGV)**
+
+---
+
+# Phase 8.5: Multilingual TTS Benchmarks (Hindi & Gujarati)
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, ARM64, 5.7 GB RAM / 6 GB Mid-Range Target, Android 12)
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suite**: `com.itantra.app.TtsMultilingualValidationTest` (4 Candidate Models, 5 Phrases each, 10-Cycle Stress)
+
+## 1. Candidate Voice Comparison & Runtime Metrics
+
+| Language | Model Candidate | Architecture | Size | Sample Rate | Load Time (ms) | Avg Synthesis Latency | Avg RTF | Peak Process PSS | 10-Cycle Delta | Mobile Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Hindi** | **`piper_hi_priyamvada`** | VITS (Piper) | **60.57 MB** | 22,050 Hz | **2,488 ms** | **774 ms** (4.5s speech) | **0.171** | **351.00 MB** | **+4.18 MB** | **PRODUCTION READY (Primary)** |
+| **Hindi** | **`piper_hi_rohan`** | VITS (Piper) | **60.03 MB** | 22,050 Hz | **1,295 ms** | **828 ms** (4.0s speech) | **0.208** | **357.02 MB** | **+5.97 MB** | **PRODUCTION READY (Alternative)** |
+| **Hindi** | **`mms_hin`** | VITS (Meta MMS) | 108.76 MB | 16,000 Hz | 1,155 ms | 3,497 ms (3.9s speech) | 0.894 | 375.95 MB | +22.73 MB | CONDITIONAL FALLBACK |
+| **Gujarati** | **`mms_guj`** | VITS (Meta MMS) | **108.75 MB** | 16,000 Hz | **1,194 ms** | **4,087 ms** (3.7s speech) | **1.119** | **396.77 MB** | **+21.08 MB** | **CONDITIONAL BASELINE** |
+
+## 2. Tactical Phrase Breakdown (Physical Hardware)
+
+| Model | Emergency 1 (RTF) | Emergency 2 (RTF) | Location (RTF) | Numbers (RTF) | Radio Check (RTF) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`piper_hi_priyamvada`** | 869ms / **0.172** | 746ms / **0.180** | 848ms / **0.163** | 752ms / **0.164** | 653ms / **0.179** |
+| **`piper_hi_rohan`** | 963ms / **0.200** | 776ms / **0.215** | 879ms / **0.193** | 817ms / **0.215** | 704ms / **0.223** |
+| **`mms_hin`** | 3528ms / 0.877 | 3095ms / 0.863 | 3685ms / 0.894 | 3704ms / 0.941 | 3473ms / 0.894 |
+| **`mms_guj`** | 3664ms / **0.927** | 3747ms / **1.004** | 5168ms / **1.131** | 5316ms / **1.643** | 2540ms / **0.917** |
+
+## 3. Stability & Leak Profile
+- **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** across all 4 candidate models.
+- **Piper Priyamvada** demonstrated near-zero resident memory creep (+4.18 MB after 10 consecutive full audio syntheses).
+
+---
+
+# Phase 8.6: Multilingual TTS Benchmarks (Telugu & Kannada)
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, ARM64, 5.7 GB RAM / 6 GB Mid-Range Target, Android 12)
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suite**: `com.itantra.app.TtsMultilingualValidationTest` (Tests 05–08, 5 Phrases each, 10-Cycle Stress)
+
+## 1. Candidate Voice Comparison & Runtime Metrics
+
+| Language | Model Candidate | Architecture | Size | Sample Rate | Cold Load Time (ms) | Avg Synthesis Latency | Avg RTF | Peak Process PSS | 10-Cycle Delta | Mobile Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Telugu** | **`piper_te_maya`** | VITS (Piper) | **60.03 MB** | 22,050 Hz | **1,430 ms** | **935 ms** (4.7s speech) | **0.197** | **402.01 MB** | **+0.16 MB** | **PRODUCTION READY (Primary)** |
+| **Telugu** | **`piper_te_venkatesh`** | VITS (Piper) | **60.57 MB** | 22,050 Hz | **2,696 ms** | **813 ms** (4.1s speech) | **0.198** | **354.63 MB** | **+26.82 MB** | **PRODUCTION READY (Alternative)** |
+| **Telugu** | **`mms_tel`** | VITS (Meta MMS) | 108.75 MB | 16,000 Hz | 1,369 ms | 5,149 ms (5.1s speech) | 1.014 | 426.74 MB | +0.07 MB | CONDITIONAL FALLBACK |
+| **Kannada** | **`mms_kan`** | VITS (Meta MMS) | **108.76 MB** | 16,000 Hz | **1,145 ms** | **6,519 ms** (6.1s speech) | **1.072** | **430.99 MB** | **+88.04 MB** | **CONDITIONAL BASELINE** |
+
+## 2. Tactical Phrase Breakdown (Physical Hardware)
+
+| Model | Emergency 1 (RTF) | Emergency 2 (RTF) | Location (RTF) | Numbers (RTF) | Radio Check (RTF) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`piper_te_maya`** | 867ms / **0.191** | 941ms / **0.186** | 1079ms / **0.189** | 977ms / **0.194** | 811ms / **0.238** |
+| **`piper_te_venkatesh`** | 765ms / **0.194** | 834ms / **0.196** | 982ms / **0.192** | 823ms / **0.187** | 663ms / **0.228** |
+| **`mms_tel`** | 5097ms / 1.038 | 4634ms / 0.934 | 6292ms / 1.031 | 5400ms / 0.981 | 4322ms / 1.105 |
+| **`mms_kan`** | 6335ms / **0.992** | 5467ms / **1.001** | 7286ms / **1.063** | 6562ms / **1.066** | 6944ms / **1.254** |
+
+## 3. Stability & Leak Profile
+- **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** across all Telugu and Kannada test executions.
+- **Piper Telugu Maya** exhibited near-zero memory growth (+0.16 MB after 10 consecutive full audio syntheses).
+
+---
+
+# Phase 8.7: Multilingual TTS Benchmarks (Malayalam & Tamil)
+
+* **Physical Test Device**: Xiaomi Redmi Note 9 Pro (`curtana`, Snapdragon 720G, ARM64, 5.7 GB RAM / 6 GB Mid-Range Target, Android 12)
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suite**: `com.itantra.app.TtsMultilingualValidationTest` (Tests 09–14, 5 Phrases each, 10-Cycle Stress)
+
+## 1. Candidate Voice Comparison & Runtime Metrics
+
+| Language | Model Candidate | Architecture | Size | Sample Rate | Cold Load Time (ms) | Avg Synthesis Latency | Avg RTF | Peak Process PSS | 10-Cycle Delta | Mobile Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Malayalam** | **`piper_ml_meera`** | VITS (Piper) | **60.03 MB** | 22,050 Hz | **1,514 ms** | **848 ms** (4.5s speech) | **0.188** | **352.50 MB** | **+84.14 MB** | **PRODUCTION READY (Primary)** |
+| **Malayalam** | **`piper_ml_arjun`** | VITS (Piper) | **60.03 MB** | 22,050 Hz | **1,500 ms** | **883 ms** (5.1s speech) | **0.184** | **411.51 MB** | **+1.54 MB** | **PRODUCTION READY (Alternative)** |
+| **Tamil** | **`piper_ta_rasa_female`** | VITS (Piper) | **60.57 MB** | 22,050 Hz | **2,424 ms** | **795 ms** (4.0s speech) | **0.196** | **361.74 MB** | **+6.57 MB** | **PRODUCTION READY (Primary)** |
+| **Tamil** | **`piper_ta_rasa_male`** | VITS (Piper) | **60.57 MB** | 22,050 Hz | **2,398 ms** | **745 ms** (3.8s speech) | **0.197** | **362.86 MB** | **+5.85 MB** | **PRODUCTION READY (Alternative)** |
+| **Malayalam** | **`mms_mal`** | VITS (Meta MMS) | 108.77 MB | 16,000 Hz | 1,124 ms | 4,639 ms (4.4s speech) | 1.045 | 399.85 MB | +64.33 MB | CONDITIONAL FALLBACK |
+| **Tamil** | **`mms_tam`** | VITS (Meta MMS) | 108.75 MB | 16,000 Hz | 1,156 ms | 6,718 ms (5.4s speech) | 1.232 | 426.71 MB | +4.31 MB | CONDITIONAL FALLBACK |
+
+## 2. Tactical Phrase Breakdown (Physical Hardware)
+
+| Model | Emergency 1 (RTF) | Emergency 2 (RTF) | Location (RTF) | Numbers (RTF) | Radio Check (RTF) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`piper_ml_meera`** | 870ms / **0.202** | 826ms / **0.188** | 876ms / **0.172** | 881ms / **0.182** | 785ms / **0.200** |
+| **`piper_ml_arjun`** | 843ms / **0.183** | 912ms / **0.186** | 965ms / **0.179** | 886ms / **0.187** | 809ms / **0.185** |
+| **`piper_ta_rasa_female`** | 771ms / **0.205** | 917ms / **0.189** | 788ms / **0.196** | 804ms / **0.183** | 697ms / **0.214** |
+| **`piper_ta_rasa_male`** | 736ms / **0.204** | 894ms / **0.192** | 759ms / **0.186** | 788ms / **0.216** | 549ms / **0.190** |
+| **`mms_mal`** | 4659ms / 1.059 | 5325ms / 1.098 | 5105ms / 0.995 | 4535ms / 1.030 | 3569ms / 1.044 |
+| **`mms_tam`** | 5184ms / 1.039 | 6276ms / 1.064 | 11405ms / 1.881 | 5671ms / 0.969 | 5053ms / 1.133 |
+
+## 3. Stability & Leak Profile
+- **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** across all Malayalam and Tamil test executions.
+- **Piper Malayalam Arjun** (+1.54 MB delta) and **Piper Tamil Rasa Male** (+5.85 MB delta) exhibited exceptional stability over 10 repeated syntheses.
+
+---
+
+# Phase 8.8: Multilingual TTS Benchmarks (Bengali & Marathi)
+
+* **Physical Test Device**: Samsung Galaxy S24 (`SM-S921B`, ARM64, 7.4 GB RAM, Android 16) & Snapdragon 720G Desktop CPU Baseline
+* **Execution Environment**: On-Device Android ART / JNI via `sherpa-onnx` CPU runtime (`num_threads = 2`)
+* **Test Suite**: `com.itantra.app.TtsMultilingualValidationTest` (Tests 15–18, 5 Phrases each, 10-Cycle Stress)
+
+## 1. Candidate Voice Comparison & Runtime Metrics
+
+| Language | Model Candidate | Architecture | Size | Sample Rate | Cold Load Time (ms) | Avg Synthesis Latency | Avg RTF | Peak Process PSS | 10-Cycle Delta | Mobile Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Bengali** | **`piper_bn_google`** | VITS (Piper, 16 spk) | **73.23 MB** | 22,050 Hz | **1,253 ms** | **445 ms** (3.3s speech) | **0.136** | **375.07 MB** | **+80.59 MB** | **PRODUCTION READY (Primary)** |
+| **Marathi** | **`piper_mr_google`** | VITS (Piper, 9 spk) | **73.21 MB** | 22,050 Hz | **935 ms** | **516 ms** (4.0s speech) | **0.127** | **380.81 MB** | **+3.77 MB** | **PRODUCTION READY (Primary)** |
+| **Bengali** | **`mms_ben`** | VITS (Meta MMS) | 108.76 MB | 16,000 Hz | 1,100 ms | 4,712 ms (4.4s speech) | 1.075 | 407.90 MB | +86.51 MB | CONDITIONAL FALLBACK |
+| **Marathi** | **`mms_mar`** | VITS (Meta MMS) | 108.76 MB | 16,000 Hz | 2,082 ms | 5,704 ms (4.3s speech) | 1.324 | 392.60 MB | +70.49 MB | CONDITIONAL FALLBACK |
+
+## 2. Tactical Phrase Breakdown (Physical Hardware)
+
+| Model | Emergency 1 (RTF) | Emergency 2 (RTF) | Location (RTF) | Numbers (RTF) | Radio Check (RTF) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`piper_bn_google`** | 653ms / **0.188** | 465ms / **0.130** | 377ms / **0.121** | 431ms / **0.114** | 302ms / **0.121** |
+| **`piper_mr_google`** | 540ms / **0.129** | 481ms / **0.125** | 573ms / **0.128** | 593ms / **0.128** | 397ms / **0.127** |
+| **`mms_ben`** | 4861ms / 1.025 | 4346ms / 0.924 | 4878ms / 1.033 | 5569ms / 1.259 | 3904ms / 1.172 |
+| **`mms_mar`** | 6425ms / 1.335 | 4978ms / 1.206 | 6368ms / 1.393 | 6355ms / 1.348 | 4393ms / 1.328 |
+
+## 3. Stability & Leak Profile
+- **0 crashes, 0 ANRs, 0 native SIGSEGV crashes** across all Bengali and Marathi test executions.
+- **Piper Marathi Google** demonstrated outstanding memory stability (**+3.77 MB** 10-cycle delta, zero leaks).

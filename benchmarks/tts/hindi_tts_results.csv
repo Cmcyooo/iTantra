@@ -1,0 +1,16 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_hi_priyamvada,VITS (Piper),FP32/ONNX,22050,2488,emergency_1,"आपातकालीन चेतावनी, सेक्टर चार में तुरंत सहायता की आवश्यकता है।",869,5.04,0.172,343.36,4.18,Natural clear female voice; excellent clarity
+piper_hi_priyamvada,VITS (Piper),FP32/ONNX,22050,2488,emergency_2,"रेड अलर्ट, सभी टीमें सुरक्षित स्थान पर पीछे हटें।",746,4.13,0.180,343.83,4.18,Urgent tactical tone; distinct phonemes
+piper_hi_priyamvada,VITS (Piper),FP32/ONNX,22050,2488,location,"हम स्टेशन अल्फा पर हैं, मुख्य द्वार से पचास मीटर उत्तर की ओर।",848,5.21,0.163,347.72,4.18,Accurate pronunciation of English loan words
+piper_hi_priyamvada,VITS (Piper),FP32/ONNX,22050,2488,numbers,"टीम में कुल बारह सदस्य हैं, बैटरी स्तर पचहत्तर प्रतिशत है।",752,4.59,0.164,348.65,4.18,Numerals synthesized smoothly
+piper_hi_priyamvada,VITS (Piper),FP32/ONNX,22050,2488,short,"रेडियो चेक, क्या आपको मेरी आवाज़ आ रही है?",653,3.65,0.179,350.99,4.18,Fast short response (<700ms)
+piper_hi_rohan,VITS (Piper),FP32/ONNX,22050,1295,emergency_1,"आपातकालीन चेतावनी, सेक्टर चार में तुरंत सहायता की आवश्यकता है।",963,4.81,0.200,355.02,5.97,Authoritative male voice; clear diction
+piper_hi_rohan,VITS (Piper),FP32/ONNX,22050,1295,emergency_2,"रेड अलर्ट, सभी टीमें सुरक्षित स्थान पर पीछे हटें।",776,3.61,0.215,355.17,5.97,Immediate emergency cadence
+piper_hi_rohan,VITS (Piper),FP32/ONNX,22050,1295,location,"हम स्टेशन अल्फा पर हैं, मुख्य द्वार से पचास मीटर उत्तर की ओर।",879,4.55,0.193,355.77,5.97,Clear spatial directions
+piper_hi_rohan,VITS (Piper),FP32/ONNX,22050,1295,numbers,"टीम में कुल बारह सदस्य हैं, बैटरी स्तर पचहत्तर प्रतिशत है।",817,3.79,0.215,356.08,5.97,Precise numbers
+piper_hi_rohan,VITS (Piper),FP32/ONNX,22050,1295,short,"रेडियो चेक, क्या आपको मेरी आवाज़ आ रही है?",704,3.15,0.223,357.01,5.97,Very responsive radio check
+mms_hin,VITS (Meta MMS),FP32/ONNX,16000,1155,emergency_1,"आपातकालीन चेतावनी, सेक्टर चार में तुरंत सहायता की आवश्यकता है।",3528,4.02,0.877,361.15,22.73,Robotic character-based cadence; slower synthesis
+mms_hin,VITS (Meta MMS),FP32/ONNX,16000,1155,emergency_2,"रेड अलर्ट, सभी टीमें सुरक्षित स्थान पर पीछे हटें।",3095,3.58,0.863,372.67,22.73,Intelligible but flat prosody
+mms_hin,VITS (Meta MMS),FP32/ONNX,16000,1155,location,"हम स्टेशन अल्फा पर हैं, मुख्य द्वार से पचास मीटर उत्तर की ओर।",3685,4.12,0.894,374.24,22.73,English loan word slight distortion
+mms_hin,VITS (Meta MMS),FP32/ONNX,16000,1155,numbers,"टीम में कुल बारह सदस्य हैं, बैटरी स्तर पचहत्तर प्रतिशत है।",3704,3.94,0.941,374.51,22.73,Adequate numeral intelligibility
+mms_hin,VITS (Meta MMS),FP32/ONNX,16000,1155,short,"रेडियो चेक, क्या आपको मेरी आवाज़ आ रही है?",3473,3.89,0.894,375.94,22.73,High latency for short message (>3.4s)

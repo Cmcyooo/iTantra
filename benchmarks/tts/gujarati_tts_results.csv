@@ -1,0 +1,6 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+mms_guj,VITS (Meta MMS),FP32/ONNX,16000,1194,emergency_1,"કટોકટી ચેતવણી, સેક્ટર ચારમાં તાત્કાલિક સહાયની જરૂર છે.",3664,3.95,0.927,359.30,21.08,Clear Gujarati vowels; robotic monotone cadence
+mms_guj,VITS (Meta MMS),FP32/ONNX,16000,1194,emergency_2,"રેડ એલર્ટ, બધા સભ્યો તાત્કાલિક સુરક્ષિત સ્થળે પહોંચો.",3747,3.73,1.004,377.86,21.08,Intelligible emergency directive; RTF 1.004
+mms_guj,VITS (Meta MMS),FP32/ONNX,16000,1194,location,"અમે સ્ટેશન આલ્ફા પર છીએ, મુખ્ય ગેટથી પચાસ મીટર ઉત્તરમાં.",5168,4.57,1.131,396.51,21.08,Location clear; synthesis latency 5.1s
+mms_guj,VITS (Meta MMS),FP32/ONNX,16000,1194,numbers,"ટીમમાં બાર સભ્યો છે, બેટરી પંચોતેર ટકા છે.",5316,3.24,1.643,396.54,21.08,Pronunciation accurate; latency spikes on conjuncts
+mms_guj,VITS (Meta MMS),FP32/ONNX,16000,1194,short,"રેડિયો ચેક, શું તમને મારો અવાજ સંભળાય છે?",2540,2.77,0.917,396.76,21.08,Good short query clarity; RTF 0.917

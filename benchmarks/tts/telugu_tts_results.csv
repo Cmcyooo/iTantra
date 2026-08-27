@@ -1,0 +1,16 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_te_maya,VITS (Piper),FP32/ONNX,22050,1430,emergency_1,"అత్యవసర హెచ్చరిక, సెక్టార్ నాలుగులో తక్షణ సహాయం అవసరం.",867,4.54,0.191,342.68,0.16,Natural melodic female voice; crisp emergency articulation
+piper_te_maya,VITS (Piper),FP32/ONNX,22050,1430,emergency_2,"రెడ్ అలర్ట్, బృందం సభ్యులందరూ వెంటనే సురక్షిత ప్రాంతానికి చేరుకోండి.",941,5.05,0.186,356.41,0.16,Clear urgency cadence; distinct syllables
+piper_te_maya,VITS (Piper),FP32/ONNX,22050,1430,location,"మేము స్టేషన్ ఆల్ఫా వద్ద ఉన్నాము, ప్రధాన ద్వారానికి ఉత్తరంగా యాభై మీటర్ల దూరంలో.",1079,5.72,0.189,403.06,0.16,Accurate loan word pronunciation ('Station Alpha')
+piper_te_maya,VITS (Piper),FP32/ONNX,22050,1430,numbers,"బృందంలో పన్నెండు మంది సభ్యులు ఉన్నారు, బ్యాటరీ డెబ్బై ఐదు శాతం ఉంది.",977,5.04,0.194,404.39,0.16,Telugu numerals rendered accurately
+piper_te_maya,VITS (Piper),FP32/ONNX,22050,1430,short,"రేడియో తనిఖీ, నా స్వరం మీకు స్పష్టంగా వినిపిస్తుందా?",811,3.41,0.238,404.14,0.16,Fast responsive short query (<850ms)
+piper_te_venkatesh,VITS (Piper),FP32/ONNX,22050,2696,emergency_1,"అత్యవసర హెచ్చరిక, సెక్టార్ నాలుగులో తక్షణ సహాయం అవసరం.",765,3.95,0.194,352.10,26.82,Clear resonant male voice
+piper_te_venkatesh,VITS (Piper),FP32/ONNX,22050,2696,emergency_2,"రెడ్ అలర్ట్, బృందం సభ్యులందరూ వెంటనే సురక్షిత ప్రాంతానికి చేరుకోండి.",834,4.25,0.196,353.40,26.82,Strong directive tone
+piper_te_venkatesh,VITS (Piper),FP32/ONNX,22050,2696,location,"మేము స్టేషన్ ఆల్ఫా వద్ద ఉన్నాము, ప్రధాన ద్వారానికి ఉత్తరంగా యాభై మీటర్ల దూరంలో.",982,5.10,0.192,354.10,26.82,Clear spatial articulation
+piper_te_venkatesh,VITS (Piper),FP32/ONNX,22050,2696,numbers,"బృందంలో పన్నెండు మంది సభ్యులు ఉన్నారు, బ్యాటరీ డెబ్బై ఐదు శాతం ఉంది.",823,4.40,0.187,354.35,26.82,Precise metrics
+piper_te_venkatesh,VITS (Piper),FP32/ONNX,22050,2696,short,"రేడియో తనిఖీ, నా స్వరం మీకు స్పష్టంగా వినిపిస్తుందా?",663,2.91,0.228,354.63,26.82,Immediate radio check reply
+mms_tel,VITS (Meta MMS),FP32/ONNX,16000,1369,emergency_1,"అత్యవసర హెచ్చరిక, సెక్టార్ నాలుగులో తక్షణ సహాయం అవసరం.",5097,4.91,1.038,385.37,0.07,Intelligible but flat monotone prosody; 5s latency
+mms_tel,VITS (Meta MMS),FP32/ONNX,16000,1369,emergency_2,"రెడ్ అలర్ట్, బృందం సభ్యులందరూ వెంటనే సురక్షిత ప్రాంతానికి చేరుకోండి.",4634,4.96,0.934,396.40,0.07,Mechanical cadence; acceptable intelligibility
+mms_tel,VITS (Meta MMS),FP32/ONNX,16000,1369,location,"మేము స్టేషన్ ఆల్ఫా వద్ద ఉన్నాము, ప్రధాన ద్వారానికి ఉత్తరంగా యాభై మీటర్ల దూరంలో.",6292,6.10,1.031,420.84,0.07,High latency (6.3s); location names clear
+mms_tel,VITS (Meta MMS),FP32/ONNX,16000,1369,numbers,"బృందంలో పన్నెండు మంది సభ్యులు ఉన్నారు, బ్యాటరీ డెబ్బై ఐదు శాతం ఉంది.",5400,5.50,0.981,426.56,0.07,Accurate numbers
+mms_tel,VITS (Meta MMS),FP32/ONNX,16000,1369,short,"రేడియో తనిఖీ, నా స్వరం మీకు స్పష్టంగా వినిపిస్తుందా?",4322,3.91,1.105,426.74,0.07,4.3s latency for short message

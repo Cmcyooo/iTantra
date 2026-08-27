@@ -1,0 +1,6 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+mms_kan,VITS (Meta MMS),FP32/ONNX,16000,1145,emergency_1,"ತುರ್ತು ಎಚ್ಚರಿಕೆ, ಸೆಕ್ಟರ್ ನಾಲ್ಕರಲ್ಲಿ ತಕ್ಷಣದ ಸಹಾಯದ ಅಗತ್ಯವಿದೆ.",6335,6.39,0.992,415.46,88.04,Clear native Kannada phonetics; somewhat robotic prosody
+mms_kan,VITS (Meta MMS),FP32/ONNX,16000,1145,emergency_2,"ರೆಡ್ ಅಲರ್ಟ್, ಎಲ್ಲಾ ತಂಡದ ಸದಸ್ಯರು ತಕ್ಷಣ ಸುರಕ್ಷಿತ ಸ್ಥಳಕ್ಕೆ ತೆರಳಿ.",5467,5.46,1.001,416.33,88.04,Intelligible emergency broadcast; RTF 1.001
+mms_kan,VITS (Meta MMS),FP32/ONNX,16000,1145,location,"ನಾವು ಸ್ಟೇಷನ್ ಆಲ್ಫಾದಲ್ಲಿದ್ದೇವೆ, ಮುಖ್ಯ ದ್ವಾರದಿಂದ ಐವತ್ತು ಮೀಟರ್ ಉತ್ತರಕ್ಕೆ.",7286,6.85,1.063,430.22,88.04,Directional guidance clear; synthesis latency 7.3s
+mms_kan,VITS (Meta MMS),FP32/ONNX,16000,1145,numbers,"ತಂಡದಲ್ಲಿ ಒಟ್ಟು ಹನ್ನೆರಡು ಸದಸ್ಯರಿದ್ದಾರೆ, ಬ್ಯಾಟರಿ ಮಟ್ಟ ಎಪ್ಪತ್ತೈದು ಪ್ರತಿಶತ ಇದೆ.",6562,6.16,1.066,430.58,88.04,Kannada numbers rendered accurately; latency 6.6s
+mms_kan,VITS (Meta MMS),FP32/ONNX,16000,1145,short,"ರೇಡಿಯೋ ಪರಿಶೀಲನೆ, ನನ್ನ ಧ್ವನಿ ನಿಮಗೆ ಕೇಳಿಸುತ್ತಿದೆಯೇ?",6944,5.54,1.254,430.99,88.04,Query intelligible; RTF 1.254 on short phrase

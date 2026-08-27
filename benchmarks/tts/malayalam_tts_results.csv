@@ -1,0 +1,16 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_ml_meera,VITS (Piper),FP32/ONNX,22050,1514,emergency_1,"അടിയന്തര മുന്നറിയിപ്പ്, സെക്ടർ നാലിൽ അടിയന്തര സഹായം ആവശ്യമാണ്.",870,4.31,0.202,336.20,84.14,Crisp natural female voice; clear Malayalam conjuncts
+piper_ml_meera,VITS (Piper),FP32/ONNX,22050,1514,emergency_2,"റെഡ് അലേർട്ട്, എല്ലാ ടീം അംഗങ്ങളും ഉടൻ സുരക്ഷിത സ്ഥാനത്തേക്ക് മാറുക.",826,4.39,0.188,342.16,84.14,Urgent directive tone; clear pronunciation
+piper_ml_meera,VITS (Piper),FP32/ONNX,22050,1514,location,"ഞങ്ങൾ സ്റ്റേഷൻ ആൽഫയിലാണ്, പ്രധാന കവാടത്തിൽ നിന്ന് അമ്പത് മീറ്റർ വടക്കോട്ട്.",876,5.08,0.172,351.29,84.14,English loan words ('Station Alpha') clear
+piper_ml_meera,VITS (Piper),FP32/ONNX,22050,1514,numbers,"ടീമിൽ പന്ത്രണ്ട് അംഗങ്ങളുണ്ട്, ബാറ്ററി നില എഴുപത്തിയഞ്ച് ശതമാനമാണ്.",881,4.83,0.182,351.68,84.14,Accurate Malayalam numeral articulation
+piper_ml_meera,VITS (Piper),FP32/ONNX,22050,1514,short,"റേഡിയോ പരിശോധന, എന്റെ ശബ്ദം വ്യക്തമായി കേൾക്കുന്നുണ്ടോ?",785,3.92,0.200,352.49,84.14,Fast radio check (<800ms)
+piper_ml_arjun,VITS (Piper),FP32/ONNX,22050,1500,emergency_1,"അടിയന്തര മുന്നറിയിപ്പ്, സെക്ടർ നാലിൽ അടിയന്തര സഹായം ആവശ്യമാണ്.",843,4.60,0.183,405.20,1.54,Resonant authoritative male voice
+piper_ml_arjun,VITS (Piper),FP32/ONNX,22050,1500,emergency_2,"റെഡ് അലേർട്ട്, എല്ലാ ടീം അംഗങ്ങളും ഉടൻ സുരക്ഷിത സ്ഥാനത്തേക്ക് മാറുക.",912,4.90,0.186,408.40,1.54,Command cadence; high field audibility
+piper_ml_arjun,VITS (Piper),FP32/ONNX,22050,1500,location,"ഞങ്ങൾ സ്റ്റേഷൻ ആൽഫയിലാണ്, പ്രധാന കവാടത്തിൽ നിന്ന് അമ്പത് മീറ്റർ വടക്കോട്ട്.",965,5.40,0.179,410.15,1.54,Accurate spatial directions
+piper_ml_arjun,VITS (Piper),FP32/ONNX,22050,1500,numbers,"ടീമിൽ പന്ത്രണ്ട് അംഗങ്ങളുണ്ട്, ബാറ്ററി നില എഴുപത്തിയഞ്ച് ശതമാനമാണ്.",886,4.75,0.187,411.20,1.54,Precise numerals; smooth prosody
+piper_ml_arjun,VITS (Piper),FP32/ONNX,22050,1500,short,"റേഡിയോ പരിശോധന, എന്റെ ശബ്ദം വ്യക്തമായി കേൾക്കുന്നുണ്ടോ?",809,4.38,0.185,413.45,1.54,Prompt radio check response; zero leaks (+1.54MB)
+mms_mal,VITS (Meta MMS),FP32/ONNX,16000,1124,emergency_1,"അടിയന്തര മുന്നറിയിപ്പ്, സെക്ടർ നാലിൽ അടിയന്തര സഹായം ആവശ്യമാണ്.",4659,4.40,1.059,382.03,64.33,Intelligible but flat monotone prosody; 4.6s latency
+mms_mal,VITS (Meta MMS),FP32/ONNX,16000,1124,emergency_2,"റെഡ് അലേർട്ട്, എല്ലാ ടീം അംഗങ്ങളും ഉടൻ സുരക്ഷിത സ്ഥാനത്തേക്ക് മാറുക.",5325,4.85,1.098,398.06,64.33,Mechanical cadence; acceptable emergency intelligibility
+mms_mal,VITS (Meta MMS),FP32/ONNX,16000,1124,location,"ഞങ്ങൾ സ്റ്റേഷൻ ആൽഫയിലാണ്, പ്രധാന കവാടത്തിൽ നിന്ന് അമ്പത് മീറ്റർ വടക്കോട്ട്.",5105,5.13,0.995,398.41,64.33,Locations intelligible; 5.1s synthesis latency
+mms_mal,VITS (Meta MMS),FP32/ONNX,16000,1124,numbers,"ടീമിൽ പന്ത്രണ്ട് അംഗങ്ങളുണ്ട്, ബാറ്ററി നില എഴുപത്തിയഞ്ച് ശതമാനമാണ്.",4535,4.40,1.030,398.75,64.33,Numerals accurate; RTF 1.03
+mms_mal,VITS (Meta MMS),FP32/ONNX,16000,1124,short,"റേഡിയോ പരിശോധന, എന്റെ ശബ്ദം വ്യക്തമായി കേൾക്കുന്നുണ്ടോ?",3569,3.42,1.044,399.85,64.33,Short query latency 3.5s; RTF 1.04

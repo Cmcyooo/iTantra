@@ -1,0 +1,16 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_ta_rasa_female,VITS (Piper),FP32/ONNX,22050,2424,emergency_1,"அவசர எச்சரிக்கை, பிரிவு நான்கில் உடனடி உதவி தேவைப்படுகிறது.",771,3.77,0.205,331.21,6.57,Natural expressive female voice; clear Tamil consonants
+piper_ta_rasa_female,VITS (Piper),FP32/ONNX,22050,2424,emergency_2,"ரெட் அலர்ட், அனைத்து குழு உறுப்பினர்களும் உடனடியாக பாதுகாப்பான இடத்திற்கு செல்லவும்.",917,4.85,0.189,359.95,6.57,Urgent command tone; crisp syllables
+piper_ta_rasa_female,VITS (Piper),FP32/ONNX,22050,2424,location,"நாங்கள் ஸ்டேஷன் ஆல்பாவில் இருக்கிறோம், பிரதான வாயிலில் இருந்து ஐம்பது மீட்டர் வடக்கே.",788,4.02,0.196,360.17,6.57,Clear transliteration and spatial bearings
+piper_ta_rasa_female,VITS (Piper),FP32/ONNX,22050,2424,numbers,"குழுவில் பன்னிரண்டு உறுப்பினர்கள் உள்ளனர், பேட்டரி எழுபத்தைந்து சதவீதம் உள்ளது.",804,4.39,0.183,360.81,6.57,Fluent Tamil numeral pronunciation
+piper_ta_rasa_female,VITS (Piper),FP32/ONNX,22050,2424,short,"ரேடியோ சோதனை, என் குரல் உங்களுக்கு தெளிவாக கேட்கிறதா?",697,3.26,0.214,361.74,6.57,Responsive radio check (<700ms)
+piper_ta_rasa_male,VITS (Piper),FP32/ONNX,22050,2398,emergency_1,"அவசர எச்சரிக்கை, பிரிவு நான்கில் உடனடி உதவி தேவைப்படுகிறது.",736,3.61,0.204,335.15,5.85,Strong masculine tactical voice; crisp articulation
+piper_ta_rasa_male,VITS (Piper),FP32/ONNX,22050,2398,emergency_2,"ரெட் அலர்ட், அனைத்து குழு உறுப்பினர்களும் உடனடியாக பாதுகாப்பான இடத்திற்கு செல்லவும்.",894,4.66,0.192,361.79,5.85,Authoritative directive; excellent projection
+piper_ta_rasa_male,VITS (Piper),FP32/ONNX,22050,2398,location,"நாங்கள் ஸ்டேஷன் ஆல்பாவில் இருக்கிறோம், பிரதான வாயிலில் இருந்து ஐம்பது மீட்டர் வடக்கே.",759,4.09,0.186,362.33,5.85,Accurate location bearings
+piper_ta_rasa_male,VITS (Piper),FP32/ONNX,22050,2398,numbers,"குழுவில் பன்னிரண்டு உறுப்பினர்கள் உள்ளனர், பேட்டரி எழுபத்தைந்து சதவீதம் உள்ளது.",788,3.66,0.216,362.97,5.85,Precise numbers; fluent cadence
+piper_ta_rasa_male,VITS (Piper),FP32/ONNX,22050,2398,short,"ரேடியோ சோதனை, என் குரல் உங்களுக்கு தெளிவாக கேட்கிறதா?",549,2.88,0.190,362.86,5.85,Rapid radio check (<550ms); zero leaks (+5.85MB)
+mms_tam,VITS (Meta MMS),FP32/ONNX,16000,1156,emergency_1,"அவசர எச்சரிக்கை, பிரிவு நான்கில் உடனடி உதவி தேவைப்படுகிறது.",5184,4.99,1.039,385.87,4.31,Robotic character-based cadence; 5.2s latency
+mms_tam,VITS (Meta MMS),FP32/ONNX,16000,1156,emergency_2,"ரெட் அலர்ட், அனைத்து குழு உறுப்பினர்களும் உடனடியாக பாதுகாப்பான இடத்திற்கு செல்லவும்.",6276,5.90,1.064,412.60,4.31,Intelligible emergency directive; 6.3s latency
+mms_tam,VITS (Meta MMS),FP32/ONNX,16000,1156,location,"நாங்கள் ஸ்டேஷன் ஆல்பாவில் இருக்கிறோம், பிரதான வாயிலில் இருந்து ஐம்பது மீட்டர் வடக்கே.",11405,6.06,1.881,423.61,4.31,Latency spike (11.4s) on complex conjunct clause
+mms_tam,VITS (Meta MMS),FP32/ONNX,16000,1156,numbers,"குழுவில் பன்னிரண்டு உறுப்பினர்கள் உள்ளனர், பேட்டரி எழுபத்தைந்து சதவீதம் உள்ளது.",5671,5.85,0.969,425.73,4.31,Accurate numeral intelligibility
+mms_tam,VITS (Meta MMS),FP32/ONNX,16000,1156,short,"ரேடியோ சோதனை, என் குரல் உங்களுக்கு தெளிவாக கேட்கிறதா?",5053,4.46,1.133,426.71,4.31,5.0s latency for short phrase

@@ -1,0 +1,11 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_mr_google,VITS (Piper),FP32/ONNX,22050,935,emergency_1,"तातडीचा इशारा, सेक्टर चारमध्ये तातडीने मदतीची गरज आहे.",540,4.20,0.129,370.79,3.77,Natural commanding male cadence; crisp Marathi conjuncts
+piper_mr_google,VITS (Piper),FP32/ONNX,22050,935,emergency_2,"रेड अलर्ट, सर्व संघ सदस्यांनी त्वरित सुरक्षित स्थळी जावे.",481,3.84,0.125,371.49,3.77,Sharp urgent articulation; 481ms synthesis latency
+piper_mr_google,VITS (Piper),FP32/ONNX,22050,935,location,"आम्ही स्टेशन अल्फा येथे आहोत, मुख्य गेटपासून पन्नास मीटर उत्तरेकडे.",573,4.49,0.128,376.72,3.77,Fluent spatial articulation ('पन्नास मीटर उत्तरेकडे')
+piper_mr_google,VITS (Piper),FP32/ONNX,22050,935,numbers,"संघामध्ये एकूण बारा सदस्य आहेत, बॅटरी पातळी पंच्याहत्तर टक्के आहे.",593,4.62,0.128,380.73,3.77,Accurate Marathi numerals and percentages ('बारा', 'पंच्याहत्तर टक्के')
+piper_mr_google,VITS (Piper),FP32/ONNX,22050,935,short,"रेडिओ चेक, माझा आवाज तुम्हाला स्पष्ट येत आहे का?",397,3.12,0.127,380.81,3.77,Instant radio check (397ms); zero memory creep (+3.77MB)
+mms_mar,VITS (Meta MMS),FP32/ONNX,16000,2082,emergency_1,"तातडीचा इशारा, सेक्टर चारमध्ये तातडीने मदतीची गरज आहे.",6425,4.81,1.335,380.37,70.49,Intelligible but mechanical character cadence; 6.4s latency
+mms_mar,VITS (Meta MMS),FP32/ONNX,16000,2082,emergency_2,"रेड अलर्ट, सर्व संघ सदस्यांनी त्वरित सुरक्षित स्थळी जावे.",4978,4.13,1.206,385.77,70.49,Adequate intelligibility; monotone
+mms_mar,VITS (Meta MMS),FP32/ONNX,16000,2082,location,"आम्ही स्टेशन अल्फा येथे आहोत, मुख्य गेटपासून पन्नास मीटर उत्तरेकडे.",6368,4.57,1.393,388.57,70.49,Heavy compute latency (6.4s) on complex compound phrase
+mms_mar,VITS (Meta MMS),FP32/ONNX,16000,2082,numbers,"संघामध्ये एकूण बारा सदस्य आहेत, बॅटरी पातळी पंच्याहत्तर टक्के आहे.",6355,4.72,1.348,388.86,70.49,Accurate numerals; 6.35s synthesis latency
+mms_mar,VITS (Meta MMS),FP32/ONNX,16000,2082,short,"रेडिओ चेक, माझा आवाज तुम्हाला स्पष्ट येत आहे का?",4393,3.31,1.328,392.60,70.49,4.4s latency on short query; RTF 1.33

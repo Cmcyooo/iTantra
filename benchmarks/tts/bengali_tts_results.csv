@@ -1,0 +1,11 @@
+Model,Architecture,Precision,SampleRate,LoadTimeMs,TestPhraseTag,PhraseText,SynthesisMs,AudioDurationS,RTF,ProcessPssMb,TenCycleDeltaMb,QualityAssessment
+piper_bn_google,VITS (Piper),FP32/ONNX,22050,1253,emergency_1,"জরুরী সতর্কতা, চার নম্বর সেক্টরে অবিলম্বে সহায়তা প্রয়োজন।",653,3.48,0.188,361.57,80.59,Expressive urgent broadcast tone; crisp conjunct articulation
+piper_bn_google,VITS (Piper),FP32/ONNX,22050,1253,emergency_2,"রেড অ্যালার্ট, দলের সকল সদস্য অবিলম্বে নিরাপদ স্থানে সরে যান।",465,3.59,0.130,364.46,80.59,Clear military/tactical command cadence; rapid synthesis (465ms)
+piper_bn_google,VITS (Piper),FP32/ONNX,22050,1253,location,"আমরা স্টেশন আলফাতে আছি, প্রধান ফটক থেকে পঞ্চাশ মিটার উত্তরে।",377,3.11,0.121,371.35,80.59,English loan word ('Station Alpha') pronounced clearly; precise bearing
+piper_bn_google,VITS (Piper),FP32/ONNX,22050,1253,numbers,"দলে মোট বারো জন সদস্য আছেন, ব্যাটারি স্তর পঁচাত্তর শতাংশ।",431,3.76,0.114,371.84,80.59,Accurate Bengali numeral inflection ('বারো জন', 'পঁচাত্তর শতাংশ')
+piper_bn_google,VITS (Piper),FP32/ONNX,22050,1253,short,"রেডিও চেক, আমার কথা কি পরিষ্কার শোনা যাচ্ছে?",302,2.49,0.121,375.06,80.59,Near-instant radio check response (302ms)
+mms_ben,VITS (Meta MMS),FP32/ONNX,16000,1100,emergency_1,"জরুরী সতর্কতা, চার নম্বর সেক্টরে অবিলম্বে সহায়তা প্রয়োজন।",4861,4.74,1.025,404.34,86.51,Intelligible but flat monotone cadence; 4.8s latency
+mms_ben,VITS (Meta MMS),FP32/ONNX,16000,1100,emergency_2,"রেড অ্যালার্ট, দলের সকল সদস্য অবিলম্বে নিরাপদ স্থানে সরে যান।",4346,4.70,0.924,404.35,86.51,Adequate intelligibility; lacks urgent inflection
+mms_ben,VITS (Meta MMS),FP32/ONNX,16000,1100,location,"আমরা স্টেশন আলফাতে আছি, প্রধান ফটক থেকে পঞ্চাশ মিটার উত্তরে।",4878,4.72,1.033,404.23,86.51,Slight robotic artifacts on complex Bengali conjuncts
+mms_ben,VITS (Meta MMS),FP32/ONNX,16000,1100,numbers,"দলে মোট বারো জন সদস্য আছেন, ব্যাটারি স্তর পঁচাত্তর শতাংশ।",5569,4.42,1.259,404.57,86.51,Accurate numerals; synthesis latency over 5.5 seconds
+mms_ben,VITS (Meta MMS),FP32/ONNX,16000,1100,short,"রেডিও চেক, আমার কথা কি পরিষ্কার শোনা যাচ্ছে?",3904,3.33,1.172,407.89,86.51,3.9s latency on short query; RTF 1.17
