@@ -275,7 +275,7 @@ fun MicrophoneTestScreen(
                 )
             } else {
                 // 3. Language Selector
-                LanguageSelectorSection(audioManager.languageModelManager, ttsManager)
+                LanguageSelectorSection(audioManager.languageModelManager, ttsManager, audioManager)
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -1367,13 +1367,20 @@ fun DeviceItem(
 @Composable
 fun LanguageSelectorSection(
     languageModelManager: LanguageModelManager,
-    ttsManager: com.itantra.app.audio.TtsManager
+    ttsManager: com.itantra.app.audio.TtsManager,
+    audioManager: com.itantra.app.audio.AudioCaptureManager? = null
 ) {
     val currentLang by languageModelManager.currentLanguage.collectAsState()
     val lifecycleState by languageModelManager.lifecycleState.collectAsState()
     val ttsLifecycleState by ttsManager.languageTtsManager.lifecycleState.collectAsState()
+    val languageMode by languageModelManager.languageMode.collectAsState()
+    val sessionLang by languageModelManager.sessionLanguage.collectAsState()
+    val sessionState by languageModelManager.sessionLanguageState.collectAsState()
+    val pendingConfirmation by languageModelManager.pendingConfirmation.collectAsState()
+    val lastDetectionResult by languageModelManager.lastDetectionResult.collectAsState()
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
+    var showManualPickerForPending by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1422,67 +1429,333 @@ fun LanguageSelectorSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            val currentVoiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(currentLang)
-            val readinessTag = if (currentVoiceConfig.isProductionReady) "Ready" else "Conditional"
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { 
-                    val isLoading = lifecycleState == ModelLifecycleState.LOADING || 
-                                    lifecycleState == ModelLifecycleState.RELEASING ||
-                                    ttsLifecycleState == ModelLifecycleState.LOADING || 
-                                    ttsLifecycleState == ModelLifecycleState.RELEASING
-                    if (!isLoading) expanded = !expanded 
-                }
+            // Language Mode: AUTO vs MANUAL
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = "${currentLang.displayName} (${currentLang.nativeName}) — $readinessTag",
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    enabled = lifecycleState != ModelLifecycleState.LOADING && lifecycleState != ModelLifecycleState.RELEASING
+                Text(
+                    text = "Mode:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
+                FilterChip(
+                    selected = languageMode == LanguageMode.AUTO,
+                    onClick = { languageModelManager.setLanguageMode(LanguageMode.AUTO) },
+                    label = { Text("AUTO") }
+                )
+                FilterChip(
+                    selected = languageMode == LanguageMode.MANUAL,
+                    onClick = { languageModelManager.setLanguageMode(LanguageMode.MANUAL) },
+                    label = { Text("MANUAL") }
+                )
+                if (languageMode == LanguageMode.AUTO) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    OutlinedButton(
+                        onClick = { languageModelManager.triggerLanguageReverification() },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Detect",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Detect", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
 
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    SupportedLanguage.values().forEach { lang ->
-                        val voiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(lang)
-                        val tag = if (voiceConfig.isProductionReady) "Ready" else "Conditional"
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (languageMode == LanguageMode.AUTO) {
+                if (pendingConfirmation != null) {
+                    // CASE B — CONFIRM-REQUIRED: Pause STT, ask operator, zero-repeat original audio
+                    val pending = pendingConfirmation!!
+                    val confPct = (pending.confidence * 100).toInt()
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Confirmation Required",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${pending.language.displayName} (${pending.language.nativeName}) detected",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Confidence: $confPct% • This language needs confirmation.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            val res = languageModelManager.confirmPendingLanguage()
+                                            if (res != null) {
+                                                audioManager?.handleConfirmedSttResult(res.first.utteranceId, res.second)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 ) {
+                                    Text("Use ${pending.language.displayName}", style = MaterialTheme.typography.labelMedium)
+                                }
+                                OutlinedButton(
+                                    onClick = { showManualPickerForPending = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Choose Language", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                } else if (sessionState != null) {
+                    // CASE A — AUTO-ACCEPT: Confident or confirmed session lock active
+                    val state = sessionState!!
+                    val confPct = (state.confidence * 100).toInt()
+                    val isConfirmed = state.source == com.itantra.app.audio.SessionLanguageSource.USER_CONFIRMED
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
                                     Text(
-                                        text = "${lang.displayName} (${lang.nativeName})",
-                                        fontWeight = if (lang == currentLang) FontWeight.Bold else FontWeight.Normal
+                                        text = "${state.language.displayName} (${state.language.nativeName})",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = tag,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (voiceConfig.isProductionReady) Color(0xFF4CAF50) else Color(0xFFFF9800),
-                                        fontWeight = FontWeight.SemiBold
+                                        text = if (isConfirmed) "Confidence: $confPct% • ✓ User Confirmed"
+                                               else "Confidence: $confPct% • ✓ Using automatically",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            },
-                            onClick = {
-                                expanded = false
-                                if (lang != currentLang) {
-                                    scope.launch {
-                                        languageModelManager.setLanguage(lang)
-                                        ttsManager.languageTtsManager.setLanguage(lang)
+                                AssistChip(
+                                    onClick = { languageModelManager.triggerLanguageReverification() },
+                                    label = { Text("Re-verify") }
+                                )
+                            }
+                        }
+                    }
+                } else if (lastDetectionResult?.routingDecision == com.itantra.app.audio.RoutingDecision.MANUAL_FALLBACK ||
+                           lastDetectionResult?.status == DetectionStatus.AMBIGUOUS) {
+                    // CASE C — AMBIGUOUS: Suggest candidates, offer manual selection
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "⚠ Language unclear",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            val topStr = lastDetectionResult?.probabilities?.entries
+                                ?.sortedByDescending { it.value }
+                                ?.take(3)
+                                ?.joinToString(", ") { "${it.key}: ${(it.value * 100).toInt()}%" } ?: ""
+                            if (topStr.isNotEmpty()) {
+                                Text(
+                                    text = "Candidates: $topStr",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            TextButton(
+                                onClick = { languageModelManager.setLanguageMode(LanguageMode.MANUAL) },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("Choose Language")
+                            }
+                        }
+                    }
+                } else if (lastDetectionResult?.status == DetectionStatus.ERROR) {
+                    // CASE D — LID FAILURE
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Automatic detection unavailable",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            TextButton(
+                                onClick = { languageModelManager.setLanguageMode(LanguageMode.MANUAL) },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("Select Language")
+                            }
+                        }
+                    }
+                } else {
+                    // Initial idle state before first utterance
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "AUTO Detection Active",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Hold PTT and speak. Reliable languages route automatically; weak languages require confirmation.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Modal dialog to pick language for pending audio
+                if (showManualPickerForPending) {
+                    AlertDialog(
+                        onDismissRequest = { showManualPickerForPending = false },
+                        title = { Text("Select Utterance Language") },
+                        text = {
+                            Column {
+                                Text(
+                                    "Choose the language to transcribe your recorded utterance:",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                SupportedLanguage.values().forEach { lang ->
+                                    TextButton(
+                                        onClick = {
+                                            scope.launch {
+                                                val res = languageModelManager.rejectPendingLanguageAndSelect(lang)
+                                                if (res != null) {
+                                                    audioManager?.handleConfirmedSttResult(res.first.utteranceId, res.second)
+                                                }
+                                                showManualPickerForPending = false
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "${lang.displayName} (${lang.nativeName})",
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
                                 }
                             }
-                        )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showManualPickerForPending = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+            } else {
+                // MANUAL Mode: ExposedDropdownMenuBox
+                val currentVoiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(currentLang)
+                val readinessTag = if (currentVoiceConfig.isProductionReady) "Ready" else "Conditional"
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { 
+                        val isLoading = lifecycleState == ModelLifecycleState.LOADING || 
+                                        lifecycleState == ModelLifecycleState.RELEASING ||
+                                        ttsLifecycleState == ModelLifecycleState.LOADING || 
+                                        ttsLifecycleState == ModelLifecycleState.RELEASING
+                        if (!isLoading) expanded = !expanded 
+                    }
+                ) {
+                    OutlinedTextField(
+                        value = "${currentLang.displayName} (${currentLang.nativeName}) — $readinessTag",
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        enabled = lifecycleState != ModelLifecycleState.LOADING && lifecycleState != ModelLifecycleState.RELEASING
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        SupportedLanguage.values().forEach { lang ->
+                            val voiceConfig = com.itantra.app.audio.TtsVoiceConfig.getConfigFor(lang)
+                            val tag = if (voiceConfig.isProductionReady) "Ready" else "Conditional"
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${lang.displayName} (${lang.nativeName})",
+                                            fontWeight = if (lang == currentLang) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        Text(
+                                            text = tag,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (voiceConfig.isProductionReady) Color(0xFF4CAF50) else Color(0xFFFF9800),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    expanded = false
+                                    if (lang != currentLang) {
+                                        scope.launch {
+                                            languageModelManager.setLanguage(lang)
+                                            ttsManager.languageTtsManager.setLanguage(lang)
+                                        }
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }

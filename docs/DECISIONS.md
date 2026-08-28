@@ -365,6 +365,49 @@
 * **Memory & Reliability Verification**:
     * Verified 0 memory leaks across 50 consecutive short utterances (delta: 31.5 MB), 20 long 8s utterances, and 20 rapid 10-language switches with 100% success rate, 0 ANRs, and 0 crashes.
 
+## Spoken Language Identification (Auto-LID) Architecture (Phase 10E)
+* **Zero New Dependencies Strategy**:
+    * Utilized existing native C++ binding `com.k2fsa.sherpa.onnx.SpokenLanguageIdentification` within `sherpa-onnx:1.13.6` (already embedded in the project).
+    * Avoided introducing Silero LID, SpeechBrain, or secondary ONNX runtime engines. Zero APK bloat from new libraries.
+* **Model Selection**:
+    * Selected Whisper Tiny Multilingual INT8 encoder (`tiny-encoder.int8.onnx`, 12.9 MB) and decoder (`tiny-decoder.int8.onnx`, 89.8 MB).
+    * Total weight size: 102.7 MB, ~39M parameters. MIT/Apache 2.0 open-source license.
+* **Preservation of Single-Active STT Model Policy**:
+    * The Whisper Tiny LID model (~45 MB runtime PSS) resides persistently in RAM for instantaneous language classification.
+    * The single-active policy for STT and TTS models remains strictly enforced: only ONE heavy Wav2Vec2/Whisper STT model and ONE Piper/MMS voice model is allocated in RAM at any time.
+    * Total combined runtime PSS is 605–619 MB, safely below the 750 MB low-memory threshold on mid-range Android hardware.
+* **Session Language Caching Policy**:
+    * Running speech LID on every single PTT transmission is wasteful, introduces unnecessary latency (~140–200 ms), and degrades walkie-talkie responsiveness.
+    * **Decision**: Establish `currentSessionLanguage = detectedLanguage` upon the initial confident identification. Subsequent conversational utterances bypass the LID model entirely, delivering **0 ms added overhead**.
+* **Language Switch Debounce & Re-verification State Machine**:
+    * To prevent single acoustic anomalies, background noises, or short syllables from erroneously flipping the language, switching requires **2 consecutive high-confidence detections** of the new language candidate.
+    * Automatic background re-verification executes every 5 utterances or when manually requested via the UI "Detect / Re-verify" action.
+* **Empirical Linguistic Finding & Odia (`or`) Mitigation**:
+    * OpenAI Whisper's standard 99-language token set completely omits Odia (`or`).
+    * In physical tests, Odia speech consistently clusters with Bengali (`bn`) (60% of samples) due to shared Eastern Indo-Aryan roots.
+    * **Architectural Mitigation**: Documented transparently; Odia confidence scores reflect ambiguity, and the UI provides clear visual indication with 1-tap manual fallback to ensure zero loss of operator communication.
+* **Acoustic Consensus & Multi-Window Temporal Slicing**:
+    * `SherpaSpokenLanguageIdentifier` performs multi-window analysis (full speech segment + 70% head and tail slices) to ensure robust confidence scoring across short and long utterances.
+    * RMS energy gating (< 0.005) immediately returns `NO_SPEECH`, skipping downstream ONNX execution on dead air or silence.
 
-
-
+## Confidence-Aware Auto-LID Safety Routing & Audio Retention (Phase 10E.1)
+* **Core Architectural Principle**:
+    * *"Auto-LID is advisory for weak languages and authoritative only for benchmark-validated reliable languages."*
+    * *"False-positive automatic routing is treated as a higher-priority UX failure than requiring user confirmation."*
+    * A bad LID prediction must NEVER silently cause iTantra to load the wrong STT model.
+* **Centralized Language Reliability Policy (`LanguageReliabilityPolicy`)**:
+    * Based on Phase 10E physical benchmarks, languages are classified into tiers:
+        * **AUTO_ACCEPT**: English (`en`), Hindi (`hi`), Tamil (`ta`), Bengali (`bn`), Telugu (`te`). Detections with confidence $\ge 0.80$ route automatically.
+        * **CONFIRM_REQUIRED**: Marathi (`mr`), Gujarati (`gu`), Kannada (`kn`), Malayalam (`ml`), Odia (`or`). High model confidence ($\ge 0.80$) does NOT authorize silent switching; explicit operator confirmation is mandatory.
+    * Centralized and configurable so future acoustic model fine-tuning can promote languages to AUTO_ACCEPT.
+* **Zero-Repeat Confirmation & PCM Buffer Retention**:
+    * When a `CONFIRM_REQUIRED` language is detected, audio capture stops and the finalized 16 kHz Float32 PCM samples are retained in `LanguageModelManager.pendingConfirmation`.
+    * STT loading is paused until operator confirmation.
+    * When the operator taps `[ Use Language ]` or chooses another language in the dialog, the **retained original audio** is immediately transcribed by the selected STT model. The operator never has to repeat speaking.
+* **Explicit Session Language Source Tracking**:
+    * Introduced `SessionLanguageSource` (`AUTO_DETECTED`, `USER_CONFIRMED`, `MANUAL_SELECTED`).
+    * Confirmed weak languages establish a `USER_CONFIRMED` session lock, allowing subsequent conversational turns to reuse the confirmed language without repeated prompts.
+* **Debounced Switching & Safety Overrides**:
+    * Automatic switching is permitted ONLY when the target language is `AUTO_ACCEPT`, confidence $\ge 0.80$, and 2 consecutive detections agree.
+    * Switching to a `CONFIRM_REQUIRED` language always requires explicit operator confirmation.
+    * Session reset clears all session locks, debouncing history, and pending confirmations.

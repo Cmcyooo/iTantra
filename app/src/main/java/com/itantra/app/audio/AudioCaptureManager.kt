@@ -98,12 +98,14 @@ class AudioCaptureManager(private val context: Context) {
     var lastFinalizedSpeech: FloatArray? = null
         private set
 
-    // Monotonic timing for latency diagnostics (Phase 12A)
+    // Monotonic timing for latency diagnostics (Phase 12A & 10E)
     var tPttPressNano: Long = 0L
     var tAudioRecordStartNano: Long = 0L
     var tVadSpeechStartNano: Long = 0L
     var tVadSpeechEndNano: Long = 0L
     var tPttReleaseNano: Long = 0L
+    var tLidStartNano: Long = 0L
+    var tLidEndNano: Long = 0L
     var tSttStartNano: Long = 0L
     var tSttEndNano: Long = 0L
 
@@ -140,6 +142,8 @@ class AudioCaptureManager(private val context: Context) {
         tVadSpeechStartNano = 0L
         tVadSpeechEndNano = 0L
         tPttReleaseNano = 0L
+        tLidStartNano = 0L
+        tLidEndNano = 0L
         tSttStartNano = 0L
         tSttEndNano = 0L
 
@@ -686,8 +690,23 @@ class AudioCaptureManager(private val context: Context) {
                 Log.w(TAG, "Failed to save debug_stt_capture.wav", e)
             }
 
+            // Phase 10E.1: Resolve language via Safety Routing
+            tLidStartNano = System.nanoTime()
+            val (decision, resolvedLang) = languageModelManager.resolveLanguageWithRouting(samples, currentUtteranceId)
+            tLidEndNano = System.nanoTime()
+            val lidDurationMs = (tLidEndNano - tLidStartNano) / 1_000_000.0
+            Log.i(TAG, "[LID-LATENCY] decision=$decision resolvedLanguage=${resolvedLang.code} duration_ms=${String.format(java.util.Locale.US, "%.1f", lidDurationMs)}")
+
+            if (decision == RoutingDecision.CONFIRM_REQUIRED) {
+                Log.i(TAG, "[PTT-ROUTING] Language ${resolvedLang.displayName} (${resolvedLang.code}) requires operator confirmation. Pausing STT, retaining original PCM buffer (${samples.size} samples).")
+                _state.value = _state.value.copy(
+                    sttStatus = SttStatus.IDLE
+                )
+                return@launch
+            }
+
             tSttStartNano = System.nanoTime()
-            Log.i(TAG, "[PTT-DIAG] STT transcription started (${samples.size} samples, RMS=${String.format(java.util.Locale.US, "%.4f", metrics.rms)})")
+            Log.i(TAG, "[PTT-DIAG] STT transcription started (${samples.size} samples, language=${resolvedLang.displayName}, RMS=${String.format(java.util.Locale.US, "%.4f", metrics.rms)})")
             val t0 = System.currentTimeMillis()
             _state.value = _state.value.copy(sttStatus = SttStatus.TRANSCRIBING)
             
@@ -702,9 +721,10 @@ class AudioCaptureManager(private val context: Context) {
             val pttToAudioStartMs = if (tPttPressNano > 0 && tAudioRecordStartNano > 0) (tAudioRecordStartNano - tPttPressNano) / 1_000_000.0 else 0.0
             val vadSpeechDurationMs = if (tVadSpeechStartNano > 0 && tVadSpeechEndNano > 0) (tVadSpeechEndNano - tVadSpeechStartNano) / 1_000_000.0 else 0.0
             val pttHoldMs = if (tPttPressNano > 0 && tPttReleaseNano > 0) (tPttReleaseNano - tPttPressNano) / 1_000_000.0 else 0.0
+            val lidMs = if (tLidStartNano > 0 && tLidEndNano > 0) (tLidEndNano - tLidStartNano) / 1_000_000.0 else 0.0
             val sttDurationMs = if (tSttStartNano > 0 && tSttEndNano > 0) (tSttEndNano - tSttStartNano) / 1_000_000.0 else 0.0
 
-            Log.i(TAG, "[PTT-LATENCY] pttPress_to_audioStart_ms=${String.format(java.util.Locale.US, "%.1f", pttToAudioStartMs)} vadSpeechDuration_ms=${String.format(java.util.Locale.US, "%.1f", vadSpeechDurationMs)} pttHold_ms=${String.format(java.util.Locale.US, "%.1f", pttHoldMs)} sttDuration_ms=${String.format(java.util.Locale.US, "%.1f", sttDurationMs)}")
+            Log.i(TAG, "[PTT-LATENCY] pttPress_to_audioStart_ms=${String.format(java.util.Locale.US, "%.1f", pttToAudioStartMs)} vadSpeechDuration_ms=${String.format(java.util.Locale.US, "%.1f", vadSpeechDurationMs)} pttHold_ms=${String.format(java.util.Locale.US, "%.1f", pttHoldMs)} lidDuration_ms=${String.format(java.util.Locale.US, "%.1f", lidMs)} sttDuration_ms=${String.format(java.util.Locale.US, "%.1f", sttDurationMs)}")
             
             if (result != null) {
                 Log.i(TAG, "[PTT-DIAG] STT transcription ended in ${elapsed}ms: '${result.text.take(30)}...' (utteranceId=$currentUtteranceId)")
@@ -721,6 +741,29 @@ class AudioCaptureManager(private val context: Context) {
                     sttStatus = SttStatus.ERROR
                 )
             }
+        }
+    }
+
+    /**
+     * Dispatches STT results following operator confirmation of a CONFIRM_REQUIRED language.
+     * Enables zero-repeat confirmation: the operator does not have to re-speak.
+     */
+    fun handleConfirmedSttResult(utteranceId: String?, result: SttResult?) {
+        val targetUtteranceId = utteranceId ?: currentUtteranceId
+        if (result != null) {
+            Log.i(TAG, "[PTT-CONFIRMED-STT] Confirmed STT complete: '${result.text.take(30)}...' (utteranceId=$targetUtteranceId)")
+            _state.value = _state.value.copy(
+                utteranceId = targetUtteranceId,
+                sttStatus = SttStatus.COMPLETE,
+                recognizedText = result.text,
+                lastSttResult = result
+            )
+        } else {
+            Log.w(TAG, "[PTT-CONFIRMED-STT] Confirmed STT returned null (utteranceId=$targetUtteranceId)")
+            _state.value = _state.value.copy(
+                utteranceId = targetUtteranceId,
+                sttStatus = SttStatus.ERROR
+            )
         }
     }
 

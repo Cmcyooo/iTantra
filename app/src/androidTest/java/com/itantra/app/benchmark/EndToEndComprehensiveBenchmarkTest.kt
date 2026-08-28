@@ -37,17 +37,18 @@ class EndToEndComprehensiveBenchmarkTest {
 
         private val RAW_HEADER = listOf(
             "timestamp", "device", "android_version", "language", "iteration", "phrase",
-            "t0_ptt_press_ms", "t1_speech_end_ms", "t2_stt_complete_ms", "t3_packet_send_ms",
-            "t4_packet_receive_ms", "t5_tts_start_ms", "t6_playback_start_ms",
-            "stt_latency_ms", "transport_latency_ms", "tts_startup_ms", "e2e_latency_ms",
+            "t0_ptt_press_ms", "t1_speech_end_ms", "t_lid_start_ms", "t_lid_end_ms",
+            "t2_stt_complete_ms", "t3_packet_send_ms", "t4_packet_receive_ms",
+            "t5_tts_start_ms", "t6_playback_start_ms", "lid_latency_ms", "stt_latency_ms",
+            "transport_latency_ms", "tts_startup_ms", "e2e_cached_ms", "e2e_autolid_ms",
             "target_met", "error"
         )
 
         private val SUMMARY_HEADER = listOf(
             "timestamp", "device", "android_version", "language", "iterations_count",
-            "stt_avg_ms", "transport_avg_ms", "tts_start_avg_ms", "e2e_avg_ms",
-            "e2e_median_ms", "e2e_p95_ms", "e2e_worst_ms", "stt_p95_ms", "tts_p95_ms",
-            "target_e2e_1s_pct", "verdict"
+            "lid_avg_ms", "stt_avg_ms", "transport_avg_ms", "tts_start_avg_ms",
+            "e2e_cached_avg_ms", "e2e_autolid_avg_ms", "lid_overhead_ms",
+            "e2e_median_ms", "e2e_p95_ms", "target_e2e_1s_pct", "verdict"
         )
 
         private lateinit var rawWriter: BenchmarkCsvWriter
@@ -145,21 +146,29 @@ class EndToEndComprehensiveBenchmarkTest {
             (0.15f * kotlin.math.sin(2.0 * Math.PI * 300.0 * i / 16000.0)).toFloat()
         }
 
+        val lidLatencies = mutableListOf<Long>()
         val sttLatencies = mutableListOf<Long>()
         val transportLatencies = mutableListOf<Long>()
         val ttsStartupLatencies = mutableListOf<Long>()
-        val e2eLatencies = mutableListOf<Long>()
+        val e2eCachedLatencies = mutableListOf<Long>()
+        val e2eAutoLidLatencies = mutableListOf<Long>()
 
         for (iter in 1..iterations) {
             val t0 = System.currentTimeMillis() // PTT Press / Speech Start
             // Speech duration
             val speechDurationMs = (target.audioDurationSec * 1000).toLong()
-            val t1 = System.currentTimeMillis() // Speech End (STT processing starts)
+            val t1 = System.currentTimeMillis() // Speech End (LID & STT processing start)
+
+            // 0. Auto-LID Language Resolution
+            val tLidStart = System.currentTimeMillis()
+            val resolvedLang = languageModelManager.resolveLanguage(syntheticAudio)
+            val tLidEnd = System.currentTimeMillis()
+            val lidLatency = (tLidEnd - tLidStart).coerceAtLeast(0)
 
             // 1. STT
             val sttResult = languageModelManager.transcribe(syntheticAudio)
             val t2 = System.currentTimeMillis() // STT Complete
-            val sttLatency = (t2 - t1).coerceAtLeast(1)
+            val sttLatency = (t2 - tLidEnd).coerceAtLeast(1)
 
             // 2. Serialize & Send
             val utteranceId = UUID.randomUUID().toString()
@@ -183,14 +192,18 @@ class EndToEndComprehensiveBenchmarkTest {
 
             val ttsStartup = (t5 - t4).coerceAtLeast(0)
             val ttsSynthesis = (t6 - t5).coerceAtLeast(1)
-            val e2eLatency = sttLatency + transportLatency + ttsStartup + ttsSynthesis
 
+            val e2eCached = sttLatency + transportLatency + ttsStartup + ttsSynthesis
+            val e2eAutoLid = lidLatency + e2eCached
+
+            lidLatencies.add(lidLatency)
             sttLatencies.add(sttLatency)
             transportLatencies.add(transportLatency)
             ttsStartupLatencies.add(ttsStartup)
-            e2eLatencies.add(e2eLatency)
+            e2eCachedLatencies.add(e2eCached)
+            e2eAutoLidLatencies.add(e2eAutoLid)
 
-            val targetMet = (e2eLatency <= 1200)
+            val targetMet = (e2eCached <= 1200)
 
             rawWriter.writeRow(
                 listOf(
@@ -202,15 +215,19 @@ class EndToEndComprehensiveBenchmarkTest {
                     target.phrase,
                     t0,
                     t1,
+                    tLidStart,
+                    tLidEnd,
                     t2,
                     t3,
                     t4,
                     t5,
                     t6,
+                    lidLatency,
                     sttLatency,
                     transportLatency,
                     ttsStartup,
-                    e2eLatency,
+                    e2eCached,
+                    e2eAutoLid,
                     if (targetMet) "YES" else "NO",
                     if (generatedAudio == null) "TTS_NULL" else ""
                 )
@@ -218,33 +235,29 @@ class EndToEndComprehensiveBenchmarkTest {
 
             Log.i(
                 TAG,
-                "[$iter/$iterations] ${lang.code} -> STT: ${sttLatency}ms | Net: ${transportLatency}ms | TTS-Start: ${ttsStartup}ms | Total E2E: ${e2eLatency}ms [TargetMet: $targetMet]"
+                "[$iter/$iterations] ${lang.code} -> LID: ${lidLatency}ms | STT: ${sttLatency}ms | Net: ${transportLatency}ms | TTS: ${ttsStartup}ms | E2E(Cached): ${e2eCached}ms | E2E(AutoLID): ${e2eAutoLid}ms"
             )
         }
 
         // Summary Statistics
+        val lidAvg = lidLatencies.average()
         val sttAvg = sttLatencies.average()
         val transportAvg = transportLatencies.average()
         val ttsStartAvg = ttsStartupLatencies.average()
-        val e2eAvg = e2eLatencies.average()
+        val e2eCachedAvg = e2eCachedLatencies.average()
+        val e2eAutoLidAvg = e2eAutoLidLatencies.average()
+        val lidOverhead = (e2eAutoLidAvg - e2eCachedAvg).coerceAtLeast(0.0)
 
-        val sortedE2E = e2eLatencies.sorted()
-        val e2eMedian = sortedE2E[sortedE2E.size / 2].toDouble()
-        val e2eP95 = sortedE2E[(sortedE2E.size * 0.95).toInt().coerceAtMost(sortedE2E.size - 1)].toDouble()
-        val e2eWorst = sortedE2E.last().toDouble()
+        val sortedCached = e2eCachedLatencies.sorted()
+        val e2eMedian = sortedCached[sortedCached.size / 2].toDouble()
+        val e2eP95 = sortedCached[(sortedCached.size * 0.95).toInt().coerceAtMost(sortedCached.size - 1)].toDouble()
 
-        val sortedStt = sttLatencies.sorted()
-        val sttP95 = sortedStt[(sortedStt.size * 0.95).toInt().coerceAtMost(sortedStt.size - 1)].toDouble()
-
-        val sortedTts = ttsStartupLatencies.sorted()
-        val ttsP95 = sortedTts[(sortedTts.size * 0.95).toInt().coerceAtMost(sortedTts.size - 1)].toDouble()
-
-        val targetMetCount = e2eLatencies.count { it <= 1000 }
+        val targetMetCount = e2eCachedLatencies.count { it <= 1000 }
         val targetMetPct = (targetMetCount.toDouble() / iterations) * 100.0
 
         val verdict = when {
-            e2eAvg <= 1000.0 && e2eP95 <= 1200.0 -> "TARGET MET (FLUID PTT)"
-            e2eAvg <= 1500.0 -> "ACCEPTABLE WALKIE-TALKIE"
+            e2eCachedAvg <= 1000.0 && e2eP95 <= 1200.0 -> "TARGET MET (FLUID PTT)"
+            e2eCachedAvg <= 1500.0 -> "ACCEPTABLE WALKIE-TALKIE"
             else -> "HIGH LATENCY (NEEDS OPTIMIZATION)"
         }
 
@@ -255,15 +268,15 @@ class EndToEndComprehensiveBenchmarkTest {
                 androidVersion,
                 lang.code,
                 iterations,
+                String.format(java.util.Locale.US, "%.1f", lidAvg),
                 String.format(java.util.Locale.US, "%.1f", sttAvg),
                 String.format(java.util.Locale.US, "%.1f", transportAvg),
                 String.format(java.util.Locale.US, "%.1f", ttsStartAvg),
-                String.format(java.util.Locale.US, "%.1f", e2eAvg),
+                String.format(java.util.Locale.US, "%.1f", e2eCachedAvg),
+                String.format(java.util.Locale.US, "%.1f", e2eAutoLidAvg),
+                String.format(java.util.Locale.US, "%.1f", lidOverhead),
                 String.format(java.util.Locale.US, "%.1f", e2eMedian),
                 String.format(java.util.Locale.US, "%.1f", e2eP95),
-                String.format(java.util.Locale.US, "%.1f", e2eWorst),
-                String.format(java.util.Locale.US, "%.1f", sttP95),
-                String.format(java.util.Locale.US, "%.1f", ttsP95),
                 String.format(java.util.Locale.US, "%.1f", targetMetPct),
                 verdict
             )
@@ -271,7 +284,7 @@ class EndToEndComprehensiveBenchmarkTest {
 
         Log.i(
             TAG,
-            "[SUMMARY ${lang.code}] E2E Avg: ${"%.1f".format(e2eAvg)}ms | P95: ${"%.1f".format(e2eP95)}ms | Target <=1.0s: ${"%.1f".format(targetMetPct)}% | Verdict: $verdict"
+            "[SUMMARY ${lang.code}] E2E Cached: ${"%.1f".format(e2eCachedAvg)}ms | E2E AutoLID: ${"%.1f".format(e2eAutoLidAvg)}ms | Overhead: ${"%.1f".format(lidOverhead)}ms | Target <=1.0s: ${"%.1f".format(targetMetPct)}% | Verdict: $verdict"
         )
     }
 
