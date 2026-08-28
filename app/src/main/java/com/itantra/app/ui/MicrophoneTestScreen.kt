@@ -10,28 +10,33 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -43,6 +48,7 @@ typealias TransportMode = com.itantra.app.comm.TransportMode
 
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MicrophoneTestScreen(
     audioManager: AudioCaptureManager,
@@ -192,7 +198,22 @@ fun MicrophoneTestScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { 
+                    Text("iTantra", fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp) 
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Transparent
+                ),
+                actions = {
+                    IconButton(onClick = { showSettings = !showSettings }) {
+                        Icon(if (showSettings) Icons.Default.Close else Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -202,37 +223,28 @@ fun MicrophoneTestScreen(
                 )
                 .verticalScroll(scrollState)
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- HEADER ---
-            HeaderSection(
+            // 1. Connection Status (Simplified)
+            UserFriendlyConnectionStatus(
                 commState = commState,
                 transportMode = transportMode,
-                registeredPeers = registeredPeers,
-                isSearching = isWifiSearching || isWifiDirectSearching || isBluetoothSearching
+                connectingDeviceName = connectingDeviceName,
+                isSearching = isWifiSearching || isWifiDirectSearching || isBluetoothSearching,
+                registeredPeers = registeredPeers
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // 1.1 Incoming Alert Card (High visibility)
+            if (activeIncomingAlert != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                IncomingAlertCard(activeIncomingAlert!!)
+            }
 
-            if (!isEmergencyMode) {
-                // One-Touch Zero-Config Emergency Button
-                Button(
-                    onClick = {
-                        transceiverManager.setEmergencyMode(true)
-                        emergencyManager.triggerEmergency()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Text("🚨 1-TOUCH HELP / EMERGENCY", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = Color.White)
-                }
+            Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // --- EMERGENCY MODE SELECTOR ---
+            // 2. Mode Selector (If not active in emergency flow)
+            if (emergencyFlowState == EmergencyFlowState.IDLE || emergencyFlowState == EmergencyFlowState.READY || !isEmergencyMode) {
                 EmergencyModeSelector(
                     isEmergency = isEmergencyMode,
                     onModeChange = { 
@@ -240,7 +252,11 @@ fun MicrophoneTestScreen(
                         if (it) emergencyManager.triggerEmergency()
                     }
                 )
-            } else {
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isEmergencyMode) {
                 // --- ZERO-CONFIG EMERGENCY SECTION ---
                 ZeroConfigEmergencySection(
                     emergencyFlowState = emergencyFlowState,
@@ -257,23 +273,21 @@ fun MicrophoneTestScreen(
                     },
                     onRequestPermission = { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
                 )
-            }
+            } else {
+                // 3. Language Selector
+                LanguageSelectorSection(audioManager.languageModelManager, ttsManager)
 
-            // --- INCOMING ALERT BANNER ---
-            if (activeIncomingAlert != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                IncomingAlertCard(activeIncomingAlert!!)
-            }
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // 4. Waveform (Real-time)
+                VoiceWaveform(
+                    rms = audioState.rms,
+                    isRecording = audioState.isRecording
+                )
 
-            // --- LANGUAGE SELECTOR ---
-            LanguageSelectorSection(audioManager.languageModelManager, ttsManager)
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (!isEmergencyMode) {
-                // --- NORMAL PTT CONTROL ---
+                // 5. PRIMARY ACTION: PTT
                 PTTSection(
                     state = transceiverState,
                     isEmergencyMode = isEmergencyMode,
@@ -287,7 +301,7 @@ fun MicrophoneTestScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // --- TRANSCRIPT SECTION ---
+            // 6. Live Transcription Panel
             TranscriptSection(
                 audioState = audioState,
                 lastMessage = commMessages.lastOrNull(),
@@ -297,23 +311,23 @@ fun MicrophoneTestScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- PERFORMANCE CARD ---
+            // Technical Performance (Small & Subtle)
             PerformanceSection(audioState, ttsManager, commManager)
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // --- SETTINGS TOGGLE ---
-            OutlinedButton(
-                onClick = { showSettings = !showSettings },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (showSettings) "HIDE SETTINGS" else "CONNECTION SETTINGS")
-            }
-
+            // 7. Secondary Controls (Collapsed by default)
             AnimatedVisibility(visible = showSettings) {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        .padding(16.dp)
+                ) {
+                    Text("Connection & Identity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     CallSignSection(
                         callSign = localCallSign,
                         onCallSignChange = { localCallSign = it },
@@ -355,7 +369,7 @@ fun MicrophoneTestScreen(
                     
                     if (transportMode == TransportMode.WIFI) {
                         DiscoverySection(
-                            title = "Nearby Wi-Fi iTantra Devices",
+                            title = "Nearby Wi-Fi Devices",
                             commState = commState,
                             connectingDeviceName = connectingDeviceName,
                             discoveredDevices = wifiDevices.map { 
@@ -376,9 +390,9 @@ fun MicrophoneTestScreen(
                         )
                     } else if (transportMode == TransportMode.WIFI_DIRECT) {
                         DiscoverySection(
-                            title = "Nearby Wi-Fi Direct iTantra Devices",
-                            statusMessage = if (!hasWifiDirectPermission) "Nearby devices permission required"
-                                            else if (!isWifiDirectAvailable) "Wi-Fi Direct unavailable"
+                            title = "Nearby P2P Devices",
+                            statusMessage = if (!hasWifiDirectPermission) "Permission required"
+                                            else if (!isWifiDirectAvailable) "Unavailable"
                                             else p2pStatusMessage,
                             commState = commState,
                             connectingDeviceName = connectingDeviceName,
@@ -388,10 +402,10 @@ fun MicrophoneTestScreen(
                                 (savedCallSign ?: baseName) to it.deviceAddress 
                             },
                             isSearching = isWifiDirectSearching,
-                            emptyMessage = if (!hasWifiDirectPermission) "Nearby devices permission required"
-                                           else if (!isWifiDirectAvailable) "Wi-Fi Direct unavailable"
-                                           else if (isWifiDirectSearching) "Searching for nearby Wi-Fi Direct devices..."
-                                           else "No nearby Wi-Fi Direct devices found. Tap Rescan.",
+                            emptyMessage = if (!hasWifiDirectPermission) "Permission required"
+                                           else if (!isWifiDirectAvailable) "Unavailable"
+                                           else if (isWifiDirectSearching) "Searching..."
+                                           else "No devices found.",
                             onConnect = { name, address -> 
                                 connectingDeviceName = name
                                 commManager.disconnect()
@@ -420,8 +434,7 @@ fun MicrophoneTestScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text("Bluetooth is turned off", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                                        Text("Turn on Bluetooth to discover nearby devices", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                                        Text("Bluetooth is off", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
                                     }
                                     Button(
                                         onClick = {
@@ -430,9 +443,7 @@ fun MicrophoneTestScreen(
                                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                                 }
                                                 context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                // Ignored
-                                            }
+                                            } catch (e: Exception) {}
                                         }
                                     ) {
                                         Text("ENABLE")
@@ -442,9 +453,9 @@ fun MicrophoneTestScreen(
                         }
 
                         DiscoverySection(
-                            title = "Nearby Bluetooth iTantra Devices",
-                            statusMessage = if (!hasBluetoothPermission) "Bluetooth permissions required"
-                                            else if (!isBluetoothEnabled) "Bluetooth is turned off"
+                            title = "Nearby Bluetooth Devices",
+                            statusMessage = if (!hasBluetoothPermission) "Permissions required"
+                                            else if (!isBluetoothEnabled) "Bluetooth off"
                                             else bluetoothStatusMessage,
                             commState = commState,
                             connectingDeviceName = connectingDeviceName,
@@ -452,9 +463,9 @@ fun MicrophoneTestScreen(
                                 peer.displayName to peer.address 
                             },
                             isSearching = isBluetoothSearching,
-                            emptyMessage = if (!isBluetoothEnabled) "Bluetooth is turned off"
-                                           else if (isBluetoothSearching) "Searching for nearby Bluetooth devices..." 
-                                           else "No nearby Bluetooth iTantra devices found",
+                            emptyMessage = if (!isBluetoothEnabled) "Bluetooth off"
+                                           else if (isBluetoothSearching) "Searching..." 
+                                           else "No devices found",
                             onConnect = { name, address -> 
                                 connectingDeviceName = name
                                 commManager.disconnect()
@@ -474,118 +485,105 @@ fun MicrophoneTestScreen(
 }
 
 @Composable
-fun HeaderSection(
+fun UserFriendlyConnectionStatus(
     commState: ConnectionState,
     transportMode: TransportMode,
-    registeredPeers: List<PeerEntry> = emptyList(),
-    isSearching: Boolean = false
+    connectingDeviceName: String?,
+    isSearching: Boolean,
+    registeredPeers: List<PeerEntry> = emptyList()
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "iTantra",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Offline Voice Transceiver",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        Row(
-            modifier = Modifier.padding(top = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                Text(
-                    text = when(transportMode) {
-                        TransportMode.WIFI -> "Local Wi-Fi"
-                        TransportMode.WIFI_DIRECT -> "Wi-Fi Direct"
-                        TransportMode.BLUETOOTH -> "Bluetooth"
-                    },
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), 
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-            Badge(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
-                Text("No Internet Required", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Surface(
-            shape = CircleShape,
-            color = when (commState) {
-                ConnectionState.CONNECTED -> Color(0xFF4CAF50).copy(alpha = 0.1f)
-                ConnectionState.CONNECTING -> Color(0xFFFFC107).copy(alpha = 0.1f)
-                else -> Color(0xFFF44336).copy(alpha = 0.1f)
-            },
-            modifier = Modifier.padding(top = 4.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when (commState) {
-                                ConnectionState.CONNECTED -> Color(0xFF4CAF50)
-                                ConnectionState.CONNECTING -> Color(0xFFFFC107)
-                                else -> Color(0xFFF44336)
-                            }
-                        )
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = when(commState) {
-                        ConnectionState.CONNECTED -> "CONNECTED"
-                        ConnectionState.CONNECTING -> "CONNECTING"
-                        ConnectionState.ERROR -> "ERROR"
-                        ConnectionState.DISCONNECTED -> "DISCONNECTED"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+    val transportName = when(transportMode) {
+        TransportMode.WIFI -> "Wi-Fi"
+        TransportMode.WIFI_DIRECT -> "P2P"
+        TransportMode.BLUETOOTH -> "Bluetooth"
+    }
 
-        // Pre-Emergency Readiness Badge
-        val reachablePeer = registeredPeers.firstOrNull()
-        Surface(
-            shape = CircleShape,
-            color = when {
-                commState == ConnectionState.CONNECTED -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-                reachablePeer != null -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-                isSearching -> Color(0xFFFFC107).copy(alpha = 0.15f)
-                else -> Color(0xFFF44336).copy(alpha = 0.15f)
-            },
-            modifier = Modifier.padding(top = 6.dp)
+    val reachablePeer = registeredPeers.firstOrNull()
+
+    val (color, text, subText) = when (commState) {
+        ConnectionState.CONNECTED -> Triple(
+            Color(0xFF4CAF50), 
+            "Connected", 
+            "${connectingDeviceName ?: "Device"} • $transportName"
+        )
+        ConnectionState.CONNECTING -> Triple(
+            Color(0xFFFFC107), 
+            "Connecting...", 
+            "${connectingDeviceName ?: "Remote Station"} • $transportName"
+        )
+        ConnectionState.ERROR -> Triple(
+            Color(0xFFF44336), 
+            "Connection Failed", 
+            "Tap Rescan below or try again"
+        )
+        ConnectionState.DISCONNECTED -> {
+            if (isSearching) Triple(Color(0xFFFFC107), "Searching...", "Finding nearby iTantra stations")
+            else if (reachablePeer != null) Triple(Color(0xFF4CAF50), "Ready", "Found ${reachablePeer.displayName} • Tap to connect")
+            else Triple(Color(0xFF9E9E9E), "Disconnected", "Select a device in Settings to begin")
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = color.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = when {
-                        commState == ConnectionState.CONNECTED -> "🟢 Ready"
-                        reachablePeer != null -> "🟢 Ready • Reachable: ${reachablePeer.displayName}"
-                        isSearching -> "🟡 Searching for nearby iTantra devices..."
-                        else -> "🔴 Searching for nearby iTantra devices..."
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        commState == ConnectionState.CONNECTED || reachablePeer != null -> Color(0xFF2E7D32)
-                        isSearching -> Color(0xFFF57F17)
-                        else -> Color(0xFFC62828)
-                    }
-                )
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(text, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = color)
+                Text(subText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
+
+@Composable
+fun VoiceWaveform(
+    rms: Double,
+    isRecording: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val normalizedRms = (rms / 32768.0).coerceIn(0.0, 1.0).toFloat()
+    val animatedRms by animateFloatAsState(
+        targetValue = if (isRecording) normalizedRms else 0.05f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "waveform"
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(15) { index ->
+            val distanceToCenter = kotlin.math.abs(index - 7)
+            val scale = (1f - (distanceToCenter / 10f)).coerceAtLeast(0.3f)
+            val barHeight = 4.dp + (32.dp * animatedRms * scale)
+            
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(barHeight)
+                    .padding(horizontal = 1.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isRecording) MaterialTheme.colorScheme.primary 
+                        else MaterialTheme.colorScheme.outlineVariant
+                    )
+            )
         }
     }
 }
@@ -953,57 +951,26 @@ fun PTTSection(
 ) {
     val isPressed = state == TransceiverState.LISTENING || state == TransceiverState.SPEAKING
     
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (isEmergencyMode) {
-            Badge(containerColor = MaterialTheme.colorScheme.error) {
-                Text(
-                    text = "🚨 EMERGENCY ALERT MODE",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onError,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+    val buttonColor by animateColorAsState(
+        targetValue = when {
+            isEmergencyMode && isPressed -> Color(0xFFB71C1C)
+            isEmergencyMode -> Color(0xFFD32F2F)
+            isPressed -> MaterialTheme.colorScheme.error
+            state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.primary
+        },
+        label = "pttColor"
+    )
 
-        Text(
-            text = when (state) {
-                TransceiverState.IDLE -> if (isEmergencyMode) "READY (ALERT)" else "READY"
-                TransceiverState.LISTENING -> if (isEmergencyMode) "RECORDING ALERT..." else "RECORDING..."
-                TransceiverState.SPEAKING -> if (isEmergencyMode) "RECORDING ALERT..." else "RECORDING..."
-                TransceiverState.TRANSCRIBING, TransceiverState.FORWARDING -> "PROCESSING..."
-                TransceiverState.SENT -> if (isEmergencyMode) "ALERT SENT ✅" else "SENT ✅"
-                TransceiverState.RECEIVING -> "RECEIVING..."
-                TransceiverState.PLAYING -> "🔊 PLAYING"
-                TransceiverState.ERROR -> "FAILED"
-            },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = when {
-                isEmergencyMode -> MaterialTheme.colorScheme.error
-                state == TransceiverState.LISTENING || state == TransceiverState.SPEAKING -> MaterialTheme.colorScheme.error
-                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
-                state == TransceiverState.SENT -> Color(0xFF4CAF50)
-                state == TransceiverState.ERROR -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.primary
-            }
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(160.dp)
+                .size(180.dp)
                 .clip(CircleShape)
-                .background(
-                    when {
-                        isEmergencyMode && isPressed -> Color(0xFFB71C1C)
-                        isEmergencyMode -> Color(0xFFD32F2F)
-                        isPressed -> MaterialTheme.colorScheme.errorContainer 
-                        else -> MaterialTheme.colorScheme.primaryContainer
-                    }
-                )
+                .background(buttonColor.copy(alpha = 0.15f))
+                .padding(12.dp)
+                .clip(CircleShape)
+                .background(buttonColor)
                 .pointerInput(hasPermission) {
                     if (!hasPermission) return@pointerInput
                     awaitPointerEventScope {
@@ -1020,43 +987,51 @@ fun PTTSection(
                 .then(if (!hasPermission) Modifier.clickable { onRequestPermission() } else Modifier),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "Talk",
-                modifier = Modifier.size(64.dp),
-                tint = if (isEmergencyMode) Color.White else if (isPressed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = when(state) {
+                        TransceiverState.TRANSCRIBING, TransceiverState.FORWARDING -> Icons.Default.Autorenew
+                        TransceiverState.SENT -> Icons.Default.Check
+                        TransceiverState.RECEIVING, TransceiverState.PLAYING -> Icons.AutoMirrored.Filled.VolumeUp
+                        else -> Icons.Default.Mic
+                    },
+                    contentDescription = "Talk",
+                    modifier = Modifier.size(56.dp),
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = when (state) {
+                        TransceiverState.IDLE -> "TALK"
+                        TransceiverState.LISTENING, TransceiverState.SPEAKING -> "RELEASE"
+                        TransceiverState.TRANSCRIBING, TransceiverState.FORWARDING -> "WAIT"
+                        TransceiverState.SENT -> "SENT"
+                        TransceiverState.RECEIVING -> "RECV"
+                        TransceiverState.PLAYING -> "VOICE"
+                        TransceiverState.ERROR -> "RETRY"
+                    },
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp
+                )
+            }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
             text = when {
-                !hasPermission -> "Tap to grant permission"
-                isPressed -> "[ RELEASE TO SEND ]"
-                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> "[ PROCESSING... ]"
-                state == TransceiverState.SENT -> "[ SENT ✓ ]"
-                state == TransceiverState.ERROR -> "[ FAILED ]"
-                isEmergencyMode -> "[ BROADCAST ALERT ]"
-                else -> "[ TALK ]"
+                !hasPermission -> "Tap to grant microphone access"
+                isPressed -> "RELEASE TO TRANSMIT"
+                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> "PROCESSING AUDIO..."
+                state == TransceiverState.SENT -> "MESSAGE DELIVERED ✓"
+                state == TransceiverState.ERROR -> "TRANSMISSION FAILED"
+                else -> "HOLD TO SPEAK"
             },
-            style = MaterialTheme.typography.titleMedium,
-            color = when {
-                isPressed -> MaterialTheme.colorScheme.error
-                state == TransceiverState.TRANSCRIBING || state == TransceiverState.FORWARDING -> MaterialTheme.colorScheme.tertiary
-                state == TransceiverState.SENT -> Color(0xFF4CAF50)
-                state == TransceiverState.ERROR -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.primary
-            },
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = if (isPressed) "Keep holding while speaking..." else "Press and hold to transmit speech",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.labelLarge,
+            color = buttonColor,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
         )
     }
 }
@@ -1068,73 +1043,81 @@ fun TranscriptSection(
     isEmergencyMode: Boolean = false,
     alertDeliveryStatus: AlertDeliveryStatus = AlertDeliveryStatus.NONE
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEmergencyMode) Color(0xFF2A1515) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        border = if (isEmergencyMode) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)) else null
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = if (isEmergencyMode) "🚨 Emergency message:" else "You said:",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isEmergencyMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                fontWeight = if (isEmergencyMode) FontWeight.Bold else FontWeight.Normal
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "LIVE TRANSCRIPTION",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
             )
-            Text(
-                text = audioState.recognizedText.ifEmpty { "..." },
-                style = MaterialTheme.typography.bodyLarge,
-                minLines = 2
-            )
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // MY SPEECH
+                Row(verticalAlignment = Alignment.Top) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("ME", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = when {
+                            audioState.sttStatus == SttStatus.TRANSCRIBING -> "Transcribing..."
+                            audioState.recognizedText.isNotEmpty() -> "\"${audioState.recognizedText}\""
+                            audioState.isRecording -> "Listening..."
+                            else -> "Your speech will appear here"
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (audioState.recognizedText.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (audioState.recognizedText.isNotEmpty()) FontWeight.Medium else FontWeight.Normal,
+                        fontStyle = if (audioState.recognizedText.isEmpty()) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                    )
+                }
 
-            // Delivery acknowledgement status
-            if (isEmergencyMode && alertDeliveryStatus != AlertDeliveryStatus.NONE) {
-                Spacer(modifier = Modifier.height(6.dp))
-                when (alertDeliveryStatus) {
-                    AlertDeliveryStatus.SENDING -> {
-                        Text(
-                            text = "Sending alert...",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
+                if (lastMessage != null) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    
+                    // RECEIVED
+                    Row(verticalAlignment = Alignment.Top) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("IN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = lastMessage.senderName ?: "Remote Station",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "\"${lastMessage.text}\"",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                    AlertDeliveryStatus.SENT -> {
-                        Text(
-                            text = "✓ Alert sent",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    AlertDeliveryStatus.DELIVERED -> {
-                        Text(
-                            text = "✓ Delivered",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                    AlertDeliveryStatus.FAILED -> {
-                        Text(
-                            text = "🚨 Alert not delivered\nCheck connection.",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    else -> {}
                 }
             }
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            
-            Text("Incoming:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
-            Text(
-                text = lastMessage?.text ?: "...",
-                style = MaterialTheme.typography.bodyLarge,
-                minLines = 2
-            )
         }
     }
 }

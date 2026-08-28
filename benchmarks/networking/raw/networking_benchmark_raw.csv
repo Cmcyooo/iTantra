@@ -1,0 +1,6 @@
+timestamp,device,android_version,message_category,message_text,text_bytes,serialized_packet_bytes,estimated_audio_sec,raw_audio_pcm_bytes,bandwidth_reduction_pct,send_latency_ms,receive_latency_ms,ack_rtt_ms,duplicate_protected,retry_success,reconnect_recovered
+1787940424012,Redmi Note 9 Pro,12,SHORT_ALERT,Roger that base.,16,182,1.5,48000,99.62,4,2,6,YES,YES,YES
+1787940424017,Redmi Note 9 Pro,12,NORMAL_STATUS,Station alpha confirms battery level seventy five percent.,58,224,3.5,112000,99.80,3,2,7,YES,YES,YES
+1787940424022,Redmi Note 9 Pro,12,COORDINATES,Coordinates latitude 12.5 longitude 77.6 altitude 300 meters heading south.,75,241,4.5,144000,99.83,3,2,7,YES,YES,YES
+1787940424027,Redmi Note 9 Pro,12,LONG_DISPATCH,Convoy alpha one reporting to base bravo western perimeter fence breached requesting immediate medical team over.,113,279,8.0,256000,99.89,3,2,6,YES,YES,YES
+1787940424032,Redmi Note 9 Pro,12,EMERGENCY_BROADCAST,EMERGENCY ALERT: Severe flooding at sector four all personnel fall back to high ground immediately.,99,265,6.5,208000,99.87,3,2,7,YES,YES,YES

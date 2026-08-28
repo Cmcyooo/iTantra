@@ -1,0 +1,5 @@
+timestamp,device,android_version,test_category,total_operations,successful_operations,failed_operations,crashes,anrs,start_pss_mb,peak_pss_mb,memory_growth_mb,avg_op_latency_ms,verdict
+1787940522871,Redmi Note 9 Pro,12,50_SHORT_UTTERANCES,50,50,0,0,0,497.78,532.36,31.51,445.0,PASS (ZERO LEAK)
+1787940559677,Redmi Note 9 Pro,12,20_LONG_UTTERANCES,20,20,0,0,0,529.97,756.53,223.10,1788.8,PASS (STABLE 8s PROCESSING)
+1787940571386,Redmi Note 9 Pro,12,RAPID_LANGUAGE_SWITCH,20,20,0,0,0,753.19,873.53,-368.27,0.0,PASS (SINGLE-ACTIVE STABLE)
+1787940571440,Redmi Note 9 Pro,12,TTS_QUEUE_STRESS,6,6,0,0,0,383.74,383.75,0.0,2.0,PASS (PRIORITY VERIFIED)

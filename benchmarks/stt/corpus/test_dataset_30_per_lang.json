@@ -1,0 +1,1852 @@
+{
+  "en": {
+    "language": "English",
+    "samples": [
+      {
+        "id": "en_01_normal",
+        "category": "normal",
+        "text": "all patrol checkpoints are reported clear and secure",
+        "group": "medium"
+      },
+      {
+        "id": "en_02_short",
+        "category": "short",
+        "text": "roger that base",
+        "group": "short"
+      },
+      {
+        "id": "en_03_long",
+        "category": "long",
+        "text": "the convoy is proceeding along the western highway toward junction seven under standard protocol",
+        "group": "long"
+      },
+      {
+        "id": "en_04_numbers",
+        "category": "numbers",
+        "text": "twelve personnel are present and battery level is seventy five percent",
+        "group": "medium"
+      },
+      {
+        "id": "en_05_location",
+        "category": "location",
+        "text": "station alpha located fifty meters north of the main gate",
+        "group": "medium"
+      },
+      {
+        "id": "en_06_emergency",
+        "category": "emergency",
+        "text": "emergency alert critical assistance needed at sector four",
+        "group": "medium"
+      },
+      {
+        "id": "en_07_radio",
+        "category": "radio",
+        "text": "radio check do you copy my transmission over",
+        "group": "medium"
+      },
+      {
+        "id": "en_08_punct",
+        "category": "punct",
+        "text": "hold position stand by for immediate orders",
+        "group": "medium"
+      },
+      {
+        "id": "en_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "squad leader vikram report to captain sharma at base",
+        "group": "medium"
+      },
+      {
+        "id": "en_10_fast",
+        "category": "fast",
+        "text": "quick update team moving into perimeter now",
+        "group": "medium"
+      },
+      {
+        "id": "en_11_tactical_1",
+        "category": "tactical",
+        "text": "red alert all units fall back to safe zone",
+        "group": "medium"
+      },
+      {
+        "id": "en_12_tactical_2",
+        "category": "tactical",
+        "text": "medical team dispatched to sector nine",
+        "group": "medium"
+      },
+      {
+        "id": "en_13_tactical_3",
+        "category": "tactical",
+        "text": "oxygen level forty percent evacuate immediately",
+        "group": "medium"
+      },
+      {
+        "id": "en_14_tactical_4",
+        "category": "tactical",
+        "text": "heavy smoke reported in warehouse two",
+        "group": "medium"
+      },
+      {
+        "id": "en_15_tactical_5",
+        "category": "tactical",
+        "text": "perimeter breach detected near boundary fence",
+        "group": "medium"
+      },
+      {
+        "id": "en_16_coords_1",
+        "category": "coords",
+        "text": "coordinates latitude twelve point five longitude seventy seven point six",
+        "group": "medium"
+      },
+      {
+        "id": "en_17_coords_2",
+        "category": "coords",
+        "text": "checkpoint delta altitude three hundred meters",
+        "group": "medium"
+      },
+      {
+        "id": "en_18_coords_3",
+        "category": "coords",
+        "text": "building four room twenty eight clear",
+        "group": "medium"
+      },
+      {
+        "id": "en_19_coords_4",
+        "category": "coords",
+        "text": "speed thirty kilometers per hour heading south",
+        "group": "medium"
+      },
+      {
+        "id": "en_20_coords_5",
+        "category": "coords",
+        "text": "relay tower five signal strength eighty percent",
+        "group": "medium"
+      },
+      {
+        "id": "en_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "convoy alpha one reporting to base bravo western perimeter fence breached near grid coordinate forty two requesting immediate medical evacuation and secondary support team over",
+        "group": "long"
+      },
+      {
+        "id": "en_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "station delta confirms oxygen level dropping to thirty percent in sector three all personnel evacuate toward southern exit gate and report headcount immediately",
+        "group": "long"
+      },
+      {
+        "id": "en_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "search and rescue team twelve moving into flooded district water level rising approximately two meters above street grade deploying inflatable boats now",
+        "group": "long"
+      },
+      {
+        "id": "en_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "emergency alert severe weather warning approaching coastal sector seven wind speeds exceeding seventy kilometers per hour secure all equipment and stand by",
+        "group": "long"
+      },
+      {
+        "id": "en_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "command center to patrol units seven and eight proceed along western highway junction four maintain radio silence until reaching staging post charlie",
+        "group": "long"
+      },
+      {
+        "id": "en_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "medical supply convoy carrying emergency rations and first aid kits has arrived at relief camp nine distribution beginning under supervision",
+        "group": "long"
+      },
+      {
+        "id": "en_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "perimeter reconnaissance reports power failure at relay tower three backup generators operational communication restored at standard frequency",
+        "group": "long"
+      },
+      {
+        "id": "en_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "tactical squad bravo moving through forest corridor toward waypoint five encounter zero hostile activity proceeding under normal operational protocol",
+        "group": "long"
+      },
+      {
+        "id": "en_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "engineering team reports structural damage to bridge across river northern span unsafe for heavy vehicles redirecting all traffic east",
+        "group": "long"
+      },
+      {
+        "id": "en_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "headquarters confirms all primary checkpoints clear and operational night patrol shifts take positions immediately and report status every thirty minutes over",
+        "group": "long"
+      }
+    ]
+  },
+  "hi": {
+    "language": "Hindi",
+    "samples": [
+      {
+        "id": "hi_01_normal",
+        "category": "normal",
+        "text": "सभी गश्ती चौकियों की स्थिति सुरक्षित और स्पष्ट है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_02_short",
+        "category": "short",
+        "text": "रोज़र बेस",
+        "group": "short"
+      },
+      {
+        "id": "hi_03_long",
+        "category": "long",
+        "text": "हमारा दस्ता पश्चिमी राजमार्ग से होते हुए जंक्शन सात की ओर सामान्य प्रोटोकॉल के तहत बढ़ रहा है",
+        "group": "long"
+      },
+      {
+        "id": "hi_04_numbers",
+        "category": "numbers",
+        "text": "टीम में कुल बारह सदस्य हैं और बैटरी स्तर पचहत्तर प्रतिशत है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_05_location",
+        "category": "location",
+        "text": "स्टेशन अल्फा मुख्य द्वार से पचास मीटर उत्तर की ओर स्थित है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_06_emergency",
+        "category": "emergency",
+        "text": "आपातकालीन चेतावनी सेक्टर चार में तुरंत सहायता की आवश्यकता है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_07_radio",
+        "category": "radio",
+        "text": "रेडियो चेक क्या आपको मेरी आवाज़ आ रही है ओवर",
+        "group": "medium"
+      },
+      {
+        "id": "hi_08_punct",
+        "category": "punct",
+        "text": "स्थिति बनाए रखें अगले आदेश की प्रतीक्षा करें",
+        "group": "medium"
+      },
+      {
+        "id": "hi_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "दस्ता नायक विक्रम बेस पर कैप्टन शर्मा को रिपोर्ट करें",
+        "group": "medium"
+      },
+      {
+        "id": "hi_10_fast",
+        "category": "fast",
+        "text": "त्वरित सूचना टीम अब सुरक्षा घेरे में प्रवेश कर रही है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_11_tactical_1",
+        "category": "tactical",
+        "text": "रेड अलर्ट सभी टीमें सुरक्षित स्थान पर पीछे हटें",
+        "group": "medium"
+      },
+      {
+        "id": "hi_12_tactical_2",
+        "category": "tactical",
+        "text": "चिकित्सा दल को सेक्टर नौ में भेजा गया है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_13_tactical_3",
+        "category": "tactical",
+        "text": "ऑक्सीजन स्तर चालीस प्रतिशत तुरंत बाहर निकलें",
+        "group": "medium"
+      },
+      {
+        "id": "hi_14_tactical_4",
+        "category": "tactical",
+        "text": "गोदाम दो में घना धुआं देखा गया है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_15_tactical_5",
+        "category": "tactical",
+        "text": "सीमा बाड़ के पास घुसपैठ की सूचना मिली है",
+        "group": "medium"
+      },
+      {
+        "id": "hi_16_coords_1",
+        "category": "coords",
+        "text": "अक्षांश बारह दशमलव पाँच देशांतर सतहत्तर दशमलव छह",
+        "group": "medium"
+      },
+      {
+        "id": "hi_17_coords_2",
+        "category": "coords",
+        "text": "चेकपॉइंट डेल्टा ऊँचाई तीन सौ मीटर",
+        "group": "medium"
+      },
+      {
+        "id": "hi_18_coords_3",
+        "category": "coords",
+        "text": "इमारत चार कमरा नंबर अट्ठाईस सुरक्षित",
+        "group": "medium"
+      },
+      {
+        "id": "hi_19_coords_4",
+        "category": "coords",
+        "text": "गति तीस किलोमीटर प्रति घंटा दक्षिण की ओर",
+        "group": "medium"
+      },
+      {
+        "id": "hi_20_coords_5",
+        "category": "coords",
+        "text": "रिले टावर पाँच सिग्नल शक्ति अस्सी प्रतिशत",
+        "group": "medium"
+      },
+      {
+        "id": "hi_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "काफिला अल्फा एक बेस ब्रावो को सूचित करता है कि ग्रिड समन्वय बयालीस के पास पश्चिमी बाड़ टूट गई है और तुरंत चिकित्सा दल की आवश्यकता है",
+        "group": "long"
+      },
+      {
+        "id": "hi_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "स्टेशन डेल्टा पुष्टि करता है कि सेक्टर तीन में ऑक्सीजन का स्तर तीस प्रतिशत तक गिर गया है सभी कर्मी दक्षिणी निकास द्वार की ओर बढ़ें",
+        "group": "long"
+      },
+      {
+        "id": "hi_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "खोज और बचाव दल बारह बाढ़ प्रभावित क्षेत्र में आगे बढ़ रहा है पानी का स्तर सड़क से दो मीटर ऊपर पहुंच चुका है नौकाएं तैनात हैं",
+        "group": "long"
+      },
+      {
+        "id": "hi_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "आपातकालीन चेतावनी तटीय सेक्टर सात में भीषण तूफान आ रहा है हवा की गति सत्तर किलोमीटर प्रति घंटा है सभी उपकरण सुरक्षित करें",
+        "group": "long"
+      },
+      {
+        "id": "hi_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "कमांड सेंटर सभी गश्ती दलों को निर्देश देता है कि पश्चिमी राजमार्ग जंक्शन चार पर पहुंचें और रेडियो संपर्क बनाए रखें",
+        "group": "long"
+      },
+      {
+        "id": "hi_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "चिकित्सा आपूर्ति काफिला राहत शिविर नौ में पहुंच चुका है भोजन और प्राथमिक उपचार सामग्री का वितरण शुरू किया जा रहा है",
+        "group": "long"
+      },
+      {
+        "id": "hi_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "निगरानी दल ने रिले टावर तीन पर बिजली आपूर्ति बाधित होने की सूचना दी है बैकअप जनरेटर चालू कर दिए गए हैं",
+        "group": "long"
+      },
+      {
+        "id": "hi_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "दस्ता ब्रावो वन क्षेत्र से होते हुए बिंदु पाँच की ओर बढ़ रहा है कोई संदिग्ध गतिविधि नहीं देखी गई है",
+        "group": "long"
+      },
+      {
+        "id": "hi_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "अभियांत्रिकी टीम ने नदी के पुल को भारी वाहनों के लिए असुरक्षित घोषित किया है सभी यातायात को पूर्व दिशा में मोड़ा गया है",
+        "group": "long"
+      },
+      {
+        "id": "hi_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "मुख्यालय पुष्टि करता है कि सभी मुख्य चौकियां सुरक्षित हैं रात्रि गश्ती दल तुरंत अपना स्थान लें और हर आधे घंटे में रिपोर्ट करें",
+        "group": "long"
+      }
+    ]
+  },
+  "mr": {
+    "language": "Marathi",
+    "samples": [
+      {
+        "id": "mr_01_normal",
+        "category": "normal",
+        "text": "सर्व गस्त चौक्या सुरक्षित आणि स्पष्ट असल्याची नोंद आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_02_short",
+        "category": "short",
+        "text": "समजले बेस",
+        "group": "short"
+      },
+      {
+        "id": "mr_03_long",
+        "category": "long",
+        "text": "आपली तुकडी पश्चिम महामार्गाने जंक्शन सातच्या दिशेने प्रमाणित नियमांनुसार पुढे जात आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_04_numbers",
+        "category": "numbers",
+        "text": "तुकडीत बारा सदस्य आहेत आणि बॅटरी पंच्याहत्तर टक्के आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_05_location",
+        "category": "location",
+        "text": "स्टेशन अल्फा मुख्य प्रवेशद्वारापासून पन्नास मीटर उत्तरेस आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_06_emergency",
+        "category": "emergency",
+        "text": "तातडीची सूचना सेक्टर चारमध्ये त्वरित मदतीची आवश्यकता आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_07_radio",
+        "category": "radio",
+        "text": "रेडिओ तपासणी माझा आवाज ऐकू येत आहे का ओव्हर",
+        "group": "medium"
+      },
+      {
+        "id": "mr_08_punct",
+        "category": "punct",
+        "text": "जागेवर थांबा पुढील आदेशाची वाट पहा",
+        "group": "medium"
+      },
+      {
+        "id": "mr_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "तुकडी प्रमुख विक्रम बेसवर कॅप्टन शर्मा यांना भेटा",
+        "group": "medium"
+      },
+      {
+        "id": "mr_10_fast",
+        "category": "fast",
+        "text": "जलद माहिती टीम आता आवारात प्रवेश करत आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_11_tactical_1",
+        "category": "tactical",
+        "text": "रेड अलर्ट सर्व पथकांनी सुरक्षित ठिकाणी मागे व्हावे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_12_tactical_2",
+        "category": "tactical",
+        "text": "वैद्यकीय पथक सेक्टर नऊकडे रवाना झाले आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_13_tactical_3",
+        "category": "tactical",
+        "text": "ऑक्सिजन पातळी चाळीस टक्के त्वरित बाहेर पडा",
+        "group": "medium"
+      },
+      {
+        "id": "mr_14_tactical_4",
+        "category": "tactical",
+        "text": "गोदाम दोनमध्ये दाट धूर दिसत आहे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_15_tactical_5",
+        "category": "tactical",
+        "text": "सीमा कुंपणाजवळ संशयास्पद हालचाल दिसली",
+        "group": "medium"
+      },
+      {
+        "id": "mr_16_coords_1",
+        "category": "coords",
+        "text": "अक्षांश बारा दशांश पाच रेखांश सत्याहत्तर दशांश सहा",
+        "group": "medium"
+      },
+      {
+        "id": "mr_17_coords_2",
+        "category": "coords",
+        "text": "चेकपॉईंट डेल्टा उंची तीनशे मीटर",
+        "group": "medium"
+      },
+      {
+        "id": "mr_18_coords_3",
+        "category": "coords",
+        "text": "इमारत चार खोली क्रमांक अठ्ठावीस सुरक्षित",
+        "group": "medium"
+      },
+      {
+        "id": "mr_19_coords_4",
+        "category": "coords",
+        "text": "वेग तीस किलोमीटर प्रति तास दक्षिणेकडे",
+        "group": "medium"
+      },
+      {
+        "id": "mr_20_coords_5",
+        "category": "coords",
+        "text": "रिले टॉवर पाच सिग्नल ऐंशी टक्के",
+        "group": "medium"
+      },
+      {
+        "id": "mr_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "तुकडी अल्फा एक बेस ब्राव्होला कळवते की ग्रिड समन्वय बेचाळीस जवळ पश्चिम कुंपण तुटले आहे आणि तातडीने वैद्यकीय मदतीची गरज आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "स्टेशन डेल्टा खात्री करतो की सेक्टर तीनमध्ये ऑक्सिजन तीस टक्क्यांपर्यंत कमी झाला आहे सर्व कर्मचाऱ्यांनी दक्षिण गेटकडे जावे",
+        "group": "long"
+      },
+      {
+        "id": "mr_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "शोध आणि बचाव पथक बारा पूरग्रस्त भागात पुढे सरकत आहे पाण्याचा स्तर दोन मीटर वाढला असून बोटी तैनात केल्या आहेत",
+        "group": "long"
+      },
+      {
+        "id": "mr_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "तातडीचा इशारा किनारपट्टीच्या सेक्टर सातवर वादळ धडकणार आहे वाऱ्याचा वेग सत्तर किलोमीटर प्रति तास असून सर्व उपकरणे सुरक्षित ठेवा",
+        "group": "long"
+      },
+      {
+        "id": "mr_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "कमांड सेंटर सर्व गस्त पथकांना पश्चिम महामार्ग जंक्शन चारकडे जाण्याचे आणि रेडिओ संपर्क चालू ठेवण्याचे आदेश देते",
+        "group": "long"
+      },
+      {
+        "id": "mr_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "वैद्यकीय मदत पुरवठा करणारी वाहने मदत छावणी नऊ येथे पोहोचली असून अन्न आणि औषधांचे वाटप सुरू झाले आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "सुरक्षा पथकाने रिले टॉवर तीनचा वीजपुरवठा खंडित झाल्याचे सांगितले आहे जनरेटर सुरू करून संपर्क पूर्ववत केला आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "तुकडी ब्राव्हो जंगलातून मार्ग काढत पॉईंट पाचकडे जात असून कोणतीही अडचण नाही सुरळीत काम चालू आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "अभियांत्रिकी पथकाने नदीवरील पूल अवजड वाहनांसाठी धोकादायक ठरवला असून सर्व वाहतूक पूर्वेकडे वळवली आहे",
+        "group": "long"
+      },
+      {
+        "id": "mr_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "मुख्यालय खात्री करते की सर्व मुख्य चौक्या सुरक्षित आहेत रात्र गस्त पथकांनी त्वरित जागा घ्यावी आणि दर अर्ध्या तासाने अहवाल द्यावा",
+        "group": "long"
+      }
+    ]
+  },
+  "gu": {
+    "language": "Gujarati",
+    "samples": [
+      {
+        "id": "gu_01_normal",
+        "category": "normal",
+        "text": "તમામ પેટ્રોલિંગ ચોકીઓ સુરક્ષિત અને સ્પષ્ટ છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_02_short",
+        "category": "short",
+        "text": "રોજર બેઝ",
+        "group": "short"
+      },
+      {
+        "id": "gu_03_long",
+        "category": "long",
+        "text": "આપણી ટુકડી પશ્ચિમી હાઇવે પરથી જંકશન સાત તરફ સામાન્ય નિયમો મુજબ આગળ વધી રહી છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_04_numbers",
+        "category": "numbers",
+        "text": "ટીમમાં બાર સભ્યો છે અને બેટરી પંચોતેર ટકા છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_05_location",
+        "category": "location",
+        "text": "સ્ટેશન આલ્ફા મુખ્ય દરવાજાથી પચાસ મીટર ઉત્તરમાં છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_06_emergency",
+        "category": "emergency",
+        "text": "કટોકટી ચેતવણી સેક્ટર ચારમાં તાત્કાલિક સહાયની જરૂર છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_07_radio",
+        "category": "radio",
+        "text": "રેડિયો ચેક શું તમને મારો અવાજ સંભળાય છે ઓવર",
+        "group": "medium"
+      },
+      {
+        "id": "gu_08_punct",
+        "category": "punct",
+        "text": "જગ્યા પર રહો આગામી આદેશની રાહ જુઓ",
+        "group": "medium"
+      },
+      {
+        "id": "gu_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "ટીમ લીડર વિક્રમ બેઝ પર કેપ્ટન શર્માને રિપોર્ટ કરો",
+        "group": "medium"
+      },
+      {
+        "id": "gu_10_fast",
+        "category": "fast",
+        "text": "ઝડપી માહિતી ટીમ હવે પરિસરમાં પ્રવેશી રહી છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_11_tactical_1",
+        "category": "tactical",
+        "text": "રેડ એલર્ટ બધા સભ્યો સુરક્ષિત સ્થળે પહોંચો",
+        "group": "medium"
+      },
+      {
+        "id": "gu_12_tactical_2",
+        "category": "tactical",
+        "text": "મેડિકલ ટીમને સેક્ટર નવમાં મોકલવામાં આવી છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_13_tactical_3",
+        "category": "tactical",
+        "text": "ઓક્સિજન સ્તર ચાલીસ ટકા તાત્કાલિક બહાર નીકળો",
+        "group": "medium"
+      },
+      {
+        "id": "gu_14_tactical_4",
+        "category": "tactical",
+        "text": "ગોડાઉન બેમાં ભારે ધુમાડો જોવા મળ્યો છે",
+        "group": "medium"
+      },
+      {
+        "id": "gu_15_tactical_5",
+        "category": "tactical",
+        "text": "સીમા વાડ પાસે શંકાસ્પદ હલચલ દેખાઈ",
+        "group": "medium"
+      },
+      {
+        "id": "gu_16_coords_1",
+        "category": "coords",
+        "text": "અક્ષાંશ બાર પોઇન્ટ પાંચ રેખાંશ સિત્તેર પોઇન્ટ છ",
+        "group": "medium"
+      },
+      {
+        "id": "gu_17_coords_2",
+        "category": "coords",
+        "text": "ચેકપોઇન્ટ ડેલ્ટા ઊંચાઈ ત્રણસો મીટર",
+        "group": "medium"
+      },
+      {
+        "id": "gu_18_coords_3",
+        "category": "coords",
+        "text": "ઇમારત ચાર રૂમ નંબર અઠ્ઠાવીસ સુરક્ષિત",
+        "group": "medium"
+      },
+      {
+        "id": "gu_19_coords_4",
+        "category": "coords",
+        "text": "ઝડપ ત્રીસ કિલોમીટર પ્રતિ કલાક દક્ષિણ તરફ",
+        "group": "medium"
+      },
+      {
+        "id": "gu_20_coords_5",
+        "category": "coords",
+        "text": "રિલે ટાવર પાંચ સિગ્નલ એંસી ટકા",
+        "group": "medium"
+      },
+      {
+        "id": "gu_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "કાફલો આલ્ફા એક બેઝ બ્રાવોને જણાવે છે કે ગ્રીડ સમન્વય બેતાલીસ પાસે પશ્ચિમ વાડ તૂટી ગઈ છે અને તાત્કાલિક તબીબી સહાયની જરૂર છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "સ્ટેશન ડેલ્ટા પુષ્ટિ કરે છે કે સેક્ટર ત્રણમાં ઓક્સિજન ત્રીસ ટકા સુધી ઘટી ગયું છે તમામ સભ્યો દક્ષિણ દરવાજા તરફ આગળ વધો",
+        "group": "long"
+      },
+      {
+        "id": "gu_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "શોધ અને બચાવ ટીમ બાર પૂરગ્રસ્ત વિસ્તારમાં પહોંચી રહી છે પાણીની સપાટી બે મીટર વધી છે અને બોટ તૈનાત કરવામાં આવી છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "કટોકટી ચેતવણી દરિયાકાંઠાના સેક્ટર સાતમાં મોટું વાવાઝોડું આવી રહ્યું છે પવનની ગતિ સિત્તેર કિલોમીટર પ્રતિ કલાક છે સાવચેત રહો",
+        "group": "long"
+      },
+      {
+        "id": "gu_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "કમાન્ડ સેન્ટર તમામ ટીમોને પશ્ચિમ હાઇવે જંકશન ચાર તરફ આગળ વધવા અને રેડિયો સંપર્કમાં રહેવા આદેશ આપે છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "તબીબી સામગ્રી ભરેલો કાફલો રાહત શિબિર નવમાં પહોંચ્યો છે ભોજન અને પ્રાથમિક સારવારનું વિતરણ શરૂ થયું છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "સુરક્ષા ટીમે રિલે ટાવર ત્રણ પર વીજળી બંધ થવાની માહિતી આપી છે બેકઅપ જનરેટર ચાલુ કરી સંપર્ક પુનઃસ્થાપિત કરાયો છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "દળ બ્રાવો જંગલ માર્ગે ચેકપોઇન્ટ પાંચ તરફ આગળ વધી રહ્યું છે પરિસ્થિતિ સામાન્ય અને નિયંત્રણ હેઠળ છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "ઇજનેરી ટીમે નદીનો પુલ ભારે વાહનો માટે જોખમી જાહેર કર્યો છે અને સમગ્ર ટ્રાફિક પૂર્વ તરફ વાળ્યો છે",
+        "group": "long"
+      },
+      {
+        "id": "gu_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "મુખ્યાલય પુષ્ટિ કરે છે કે તમામ મુખ્ય ચેકપોસ્ટ સુરક્ષિત છે રાત્રિ પેટ્રોલિંગ ટુકડી તુરંત ફરજ પર હાજર થાય",
+        "group": "long"
+      }
+    ]
+  },
+  "bn": {
+    "language": "Bengali",
+    "samples": [
+      {
+        "id": "bn_01_normal",
+        "category": "normal",
+        "text": "সমস্ত টহল চৌকি নিরাপদ এবং স্পষ্ট রিপোর্ট করা হয়েছে",
+        "group": "medium"
+      },
+      {
+        "id": "bn_02_short",
+        "category": "short",
+        "text": "রজার বেস",
+        "group": "short"
+      },
+      {
+        "id": "bn_03_long",
+        "category": "long",
+        "text": "আমাদের দল পশ্চিম মহাসড়ক ধরে জংশন সাতের দিকে সাধারণ নিয়ম মেনে এগিয়ে চলেছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_04_numbers",
+        "category": "numbers",
+        "text": "দলে বারো জন সদস্য আছেন এবং ব্যাটারি পঁচাত্তর শতাংশ",
+        "group": "medium"
+      },
+      {
+        "id": "bn_05_location",
+        "category": "location",
+        "text": "স্টেশন আলফা প্রধান গেট থেকে পঞ্চাশ মিটার উত্তরে অবস্থিত",
+        "group": "medium"
+      },
+      {
+        "id": "bn_06_emergency",
+        "category": "emergency",
+        "text": "জরুরি সতর্কতা সেক্টর চারে অবিলম্বে সহায়তার প্রয়োজন",
+        "group": "medium"
+      },
+      {
+        "id": "bn_07_radio",
+        "category": "radio",
+        "text": "রেডিও চেক আপনি কি আমার কথা শুনতে পাচ্ছেন ওভার",
+        "group": "medium"
+      },
+      {
+        "id": "bn_08_punct",
+        "category": "punct",
+        "text": "অবস্থান ধরে রাখুন পরবর্তী আদেশের জন্য অপেক্ষা করুন",
+        "group": "medium"
+      },
+      {
+        "id": "bn_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "দলনেতা বিক্রম বেসে ক্যাপ্টেন শর্মার সাথে দেখা করুন",
+        "group": "medium"
+      },
+      {
+        "id": "bn_10_fast",
+        "category": "fast",
+        "text": "দ্রুত তথ্য টিম এখন চত্বরে প্রবেশ করছে",
+        "group": "medium"
+      },
+      {
+        "id": "bn_11_tactical_1",
+        "category": "tactical",
+        "text": "রেড অ্যালার্ট সমস্ত দল নিরাপদ স্থানে সরে যান",
+        "group": "medium"
+      },
+      {
+        "id": "bn_12_tactical_2",
+        "category": "tactical",
+        "text": "মেডিকেল টিম সেক্টর নয়ে পাঠানো হয়েছে",
+        "group": "medium"
+      },
+      {
+        "id": "bn_13_tactical_3",
+        "category": "tactical",
+        "text": "অক্সিজেন স্তর চল্লিশ শতাংশ অবিলম্বে বের হন",
+        "group": "medium"
+      },
+      {
+        "id": "bn_14_tactical_4",
+        "category": "tactical",
+        "text": "গুদাম দুইয়ে ভারী ধোঁয়া দেখা গেছে",
+        "group": "medium"
+      },
+      {
+        "id": "bn_15_tactical_5",
+        "category": "tactical",
+        "text": "সীমান্ত বেড়ার কাছে সন্দেহজনক গতিবিধি",
+        "group": "medium"
+      },
+      {
+        "id": "bn_16_coords_1",
+        "category": "coords",
+        "text": "অক্ষাংশ বারো দশমিক পাঁচ দ্রাঘিমাংশ সাতাাত্তর দশমিক ছয়",
+        "group": "medium"
+      },
+      {
+        "id": "bn_17_coords_2",
+        "category": "coords",
+        "text": "চেকপয়েন্ট ডেল্টা উচ্চতা তিনশত মিটার",
+        "group": "medium"
+      },
+      {
+        "id": "bn_18_coords_3",
+        "category": "coords",
+        "text": "ভবন চার রুম নম্বর আঠাশ নিরাপদ",
+        "group": "medium"
+      },
+      {
+        "id": "bn_19_coords_4",
+        "category": "coords",
+        "text": "গতি ত্রিশ কিলোমিটার প্রতি ঘণ্টা দক্ষিণ দিকে",
+        "group": "medium"
+      },
+      {
+        "id": "bn_20_coords_5",
+        "category": "coords",
+        "text": "রিলে টাওয়ার পাঁচ সংকেত আশি শতাংশ",
+        "group": "medium"
+      },
+      {
+        "id": "bn_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "কনভয় আলফা এক বেস ব্রাভোকে জানাচ্ছে গ্রিড কোঅর্ডিনেট বিয়াল্লিশের কাছে পশ্চিম সীমানা ভেঙে পড়েছে অবিলম্বে চিকিৎসা সাহায্য প্রয়োজন",
+        "group": "long"
+      },
+      {
+        "id": "bn_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "স্টেশন ডেল্টা নিশ্চিত করছে তিন নম্বর সেক্টরে অক্সিজেনের মাত্রা ত্রিশ শতাংশে নেমে এসেছে সকল কর্মী দক্ষিণ গেটের দিকে যান",
+        "group": "long"
+      },
+      {
+        "id": "bn_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "অনুসন্ধান ও উদ্ধারকারী দল বারো বন্যা কবলিত অঞ্চলে এগিয়ে চলেছে জলস্তর দুই মিটার বৃদ্ধি পেয়েছে নৌকা মোতায়েন করা হয়েছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "জরুরী সতর্কতা উপকূলীয় সেক্টর সাতে তীব্র ঝড় আঘাত হানতে চলেছে বাতাসের গতি সত্তর কিলোমিটার প্রতি ঘণ্টা সকলে প্রস্তুত থাকুন",
+        "group": "long"
+      },
+      {
+        "id": "bn_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "কমান্ড সেন্টার সকল টহল দলকে পশ্চিম হাইওয়ে জংশন চারে পৌঁছাতে এবং রেডিও যোগাযোগ বজায় রাখতে নির্দেশ দিচ্ছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "চিকিৎসা ত্রাণবাহী কনভয় নয় নম্বর শিবিরে পৌঁছেছে খাদ্য এবং প্রাথমিক চিকিৎসা সামগ্রী বিতরণ শুরু করা হচ্ছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "সুরক্ষা দল জানিয়েছে রিলে টাওয়ার তিনে বিদ্যুৎ বিভ্রাট ঘটেছে ব্যাকআপ জেনারেটর চালু করে সংযোগ স্বাভাবিক করা হয়েছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "ট্যাকটিক্যাল স্কোয়াড ব্রাভো জঙ্গলের পথ দিয়ে পাঁচ নম্বর পয়েন্টের দিকে এগোচ্ছে পরিস্থিতি সম্পূর্ণ শান্ত ও নিরাপদ",
+        "group": "long"
+      },
+      {
+        "id": "bn_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "প্রকৌশলী দল নদীর সেতুটিকে ভারী যানবাহনের জন্য বিপজ্জনক ঘোষণা করেছে সমস্ত যান চলাচল পূর্ব দিকে ঘুরিয়ে দেওয়া হয়েছে",
+        "group": "long"
+      },
+      {
+        "id": "bn_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "সদর দপ্তর নিশ্চিত করছে সমস্ত প্রধান চৌকি সুরক্ষিত রয়েছে রাতের টহল দল অবিলম্বে অবস্থান নিয়ে প্রতি আধ ঘণ্টায় রিপোর্ট দিন",
+        "group": "long"
+      }
+    ]
+  },
+  "te": {
+    "language": "Telugu",
+    "samples": [
+      {
+        "id": "te_01_normal",
+        "category": "normal",
+        "text": "అన్ని పెట్రోలింగ్ చెక్‌పోస్టులు సురక్షితంగా ఉన్నాయని నివేదించబడింది",
+        "group": "medium"
+      },
+      {
+        "id": "te_02_short",
+        "category": "short",
+        "text": "రోజర్ బేస్",
+        "group": "short"
+      },
+      {
+        "id": "te_03_long",
+        "category": "long",
+        "text": "మా బృందం పశ్చిమ రహదారి గుండా జంక్షన్ ఏడు వైపు సాధారణ నిబంధనల ప్రకారం ముందుకు సాగుతోంది",
+        "group": "long"
+      },
+      {
+        "id": "te_04_numbers",
+        "category": "numbers",
+        "text": "బృందంలో పన్నెండు మంది సభ్యులు ఉన్నారు మరియు బ్యాటరీ డెబ్బై ఐదు శాతం ఉంది",
+        "group": "medium"
+      },
+      {
+        "id": "te_05_location",
+        "category": "location",
+        "text": "స్టేషన్ ఆల్ఫా ప్రధాన ద్వారం నుండి యాభై మీటర్ల ఉత్తరాన ఉంది",
+        "group": "medium"
+      },
+      {
+        "id": "te_06_emergency",
+        "category": "emergency",
+        "text": "అత్యవసర హెచ్చరిక సెక్టార్ నాలుగులో తక్షణ సహాయం అవసరం",
+        "group": "medium"
+      },
+      {
+        "id": "te_07_radio",
+        "category": "radio",
+        "text": "రేడియో చెక్ నా మాటలు వినిపిస్తున్నాయా ఓవర్",
+        "group": "medium"
+      },
+      {
+        "id": "te_08_punct",
+        "category": "punct",
+        "text": "అక్కడే ఉండండి తదుపరి ఆదేశాల కోసం వేచి ఉండండి",
+        "group": "medium"
+      },
+      {
+        "id": "te_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "టీమ్ లీడర్ విక్రమ్ బేస్ వద్ద కెప్టెన్ శర్మను కలవండి",
+        "group": "medium"
+      },
+      {
+        "id": "te_10_fast",
+        "category": "fast",
+        "text": "త్వరిత సమాచారం బృందం ఇప్పుడు పరిధిలోకి ప్రవేశిస్తోంది",
+        "group": "medium"
+      },
+      {
+        "id": "te_11_tactical_1",
+        "category": "tactical",
+        "text": "రెడ్ అలర్ట్ అన్ని బృందాలు సురక్షిత ప్రాంతానికి చేరుకోవాలి",
+        "group": "medium"
+      },
+      {
+        "id": "te_12_tactical_2",
+        "category": "tactical",
+        "text": "వైద్య బృందాన్ని సెక్టార్ తొమ్మిదికి పంపారు",
+        "group": "medium"
+      },
+      {
+        "id": "te_13_tactical_3",
+        "category": "tactical",
+        "text": "ఆక్సిజన్ స్థాయి నలభై శాతం వెంటనే బయటకు రండి",
+        "group": "medium"
+      },
+      {
+        "id": "te_14_tactical_4",
+        "category": "tactical",
+        "text": "గిడ్డంగి రెండులో దట్టమైన పొగ కనిపించింది",
+        "group": "medium"
+      },
+      {
+        "id": "te_15_tactical_5",
+        "category": "tactical",
+        "text": "సరిహద్దు కంచె వద్ద అనుమానాస్పద కదలికలు",
+        "group": "medium"
+      },
+      {
+        "id": "te_16_coords_1",
+        "category": "coords",
+        "text": "అక్షాంశం పన్నెండు పాయింట్ ఐదు రేఖాంశం డెబ్బై ఏడు పాయింట్ ఆరు",
+        "group": "medium"
+      },
+      {
+        "id": "te_17_coords_2",
+        "category": "coords",
+        "text": "చెక్‌పాయింట్ డెల్టా ఎత్తు మూడు వందల మీటర్లు",
+        "group": "medium"
+      },
+      {
+        "id": "te_18_coords_3",
+        "category": "coords",
+        "text": "భవనం నాలుగు గది సంఖ్య ఇరవై ఎనిమిది సురక్షితం",
+        "group": "medium"
+      },
+      {
+        "id": "te_19_coords_4",
+        "category": "coords",
+        "text": "వేగం ముప్పై కిలోమీటర్లు గంటకు దక్షిణం వైపు",
+        "group": "medium"
+      },
+      {
+        "id": "te_20_coords_5",
+        "category": "coords",
+        "text": "రిలే టవర్ ఐదు సిగ్నల్ ఎనభై శాతం",
+        "group": "medium"
+      },
+      {
+        "id": "te_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "కాన్వాయ్ ఆల్ఫా ఒకటి బేస్ బ్రావోకు నివేదిస్తుంది గ్రిడ్ సమన్వయం నలభై రెండు వద్ద పశ్చిమ సరిహద్దు కంచె దెబ్బతింది తక్షణ వైద్య సహాయం కావాలి",
+        "group": "long"
+      },
+      {
+        "id": "te_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "స్టేషన్ డెల్టా ధృవీకరిస్తుంది సెక్టార్ మూడులో ఆక్సిజన్ స్థాయి ముప్పై శాతానికి పడిపోయింది సిబ్బంది అంతా దక్షిణ ద్వారం వైపు వెళ్లండి",
+        "group": "long"
+      },
+      {
+        "id": "te_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "శోధన మరియు సహాయక బృందం పన్నెండు వరద ప్రాంతంలోకి చేరుకుంటుంది నీటి మట్టం రెండు మీటర్లు పెరిగింది పడవలు సిద్ధం చేశాము",
+        "group": "long"
+      },
+      {
+        "id": "te_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "అత్యవసర హెచ్చరిక తీరప్రాంత సెక్టార్ ఏడులో తీవ్రమైన తుఫాను వస్తుంది గాలి వేగం గంటకు డెబ్బై కిలోమీటర్లు అందరూ జాగ్రత్తగా ఉండండి",
+        "group": "long"
+      },
+      {
+        "id": "te_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "కమాండ్ సెంటర్ పెట్రోలింగ్ బృందాలకు పశ్చిమ రహదారి జంక్షన్ నాలుగు వద్దకు చేరుకోవాలని రేడియో సంప్రదింపుల్లో ఉండాలని ఆదేశించింది",
+        "group": "long"
+      },
+      {
+        "id": "te_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "వైద్య సామాగ్రి కాన్వాయ్ తొమ్మిదివ శిబిరానికి చేరుకుంది ఆహారం మరియు ప్రథమ చికిత్స కిట్లు పంపిణీ ప్రారంభమైంది",
+        "group": "long"
+      },
+      {
+        "id": "te_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "రిలే టవర్ మూడు వద్ద విద్యుత్ నిలిచిపోయిందని బృందం తెలిపింది జనరేటర్లు ప్రారంభించి కమ్యూనికేషన్ పునరుద్ధరించాము",
+        "group": "long"
+      },
+      {
+        "id": "te_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "బృందం బ్రావో అటవీ మార్గం గుండా పాయింట్ ఐదు వైపు కదులుతోంది ఎలాంటి అనుమానాస్పద కదలికలు లేవు అంతా సురక్షితం",
+        "group": "long"
+      },
+      {
+        "id": "te_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "నదిపై ఉన్న వంతెన భారీ వాహనాలకు సురక్షితం కాదని ఇంజనీరింగ్ బృందం తెలిపింది ట్రాఫిక్ మొత్తం తూర్పు వైపు మళ్లించాము",
+        "group": "long"
+      },
+      {
+        "id": "te_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "ప్రధాన చెక్‌పోస్టులన్నీ సురక్షితంగా ఉన్నాయని ప్రధాన కార్యాలయం నిర్ధారించింది రాత్రి గస్తీ బృందాలు వెంటనే స్థానాలను తీసుకోండి",
+        "group": "long"
+      }
+    ]
+  },
+  "kn": {
+    "language": "Kannada",
+    "samples": [
+      {
+        "id": "kn_01_normal",
+        "category": "normal",
+        "text": "ಎಲ್ಲಾ ಗಸ್ತು ಚೆಕ್‌ಪೋಸ್ಟ್‌ಗಳು ಸುರಕ್ಷಿತವಾಗಿವೆ ಎಂದು ವರದಿಯಾಗಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_02_short",
+        "category": "short",
+        "text": "ರೋಜರ್ ಬೇಸ್",
+        "group": "short"
+      },
+      {
+        "id": "kn_03_long",
+        "category": "long",
+        "text": "ನಮ್ಮ ತಂಡವು ಪಶ್ಚಿಮ ಹೆದ್ದಾರಿಯ ಮೂಲಕ ಜಂಕ್ಷನ್ ಏಳರ ಕಡೆಗೆ ಸಾಮಾನ್ಯ ನಿಯಮಗಳ ಪ್ರಕಾರ ಸಾಗುತ್ತಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_04_numbers",
+        "category": "numbers",
+        "text": "ತಂಡದಲ್ಲಿ ಹನ್ನೆರಡು ಸದಸ್ಯರಿದ್ದಾರೆ ಮತ್ತು ಬ್ಯಾಟರಿ ಎಪ್ಪತ್ತೈದು ಪ್ರತಿಶತ ಇದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_05_location",
+        "category": "location",
+        "text": "ಸ್ಟೇಷನ್ ಆಲ್ಫಾ ಮುಖ್ಯ ದ್ವಾರದಿಂದ ಐವತ್ತು ಮೀಟರ್ ಉತ್ತರದಲ್ಲಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_06_emergency",
+        "category": "emergency",
+        "text": "ತುರ್ತು ಎಚ್ಚರಿಕೆ ಸೆಕ್ಟರ್ ನಾಲ್ಕರಲ್ಲಿ ತಕ್ಷಣದ ಸಹಾಯದ ಅಗತ್ಯವಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_07_radio",
+        "category": "radio",
+        "text": "ರೇಡಿಯೋ ತಪಾಸಣೆ ನನ್ನ ಧ್ವನಿ ಕೇಳಿಸುತ್ತಿದೆಯೇ ಓವರ್",
+        "group": "medium"
+      },
+      {
+        "id": "kn_08_punct",
+        "category": "punct",
+        "text": "ಅಲ್ಲೇ ಇರಿ ಮುಂದಿನ ಆದೇಶಕ್ಕಾಗಿ ಕಾಯಿರಿ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "ತಂಡದ ನಾಯಕ ವಿಕ್ರಮ್ ಬೇಸ್‌ನಲ್ಲಿ ಕ್ಯಾಪ್ಟನ್ ಶರ್ಮಾ ಅವರನ್ನು ಭೇಟಿ ಮಾಡಿ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_10_fast",
+        "category": "fast",
+        "text": "ತ್ವರಿತ ಮಾಹಿತಿ ತಂಡವು ಈಗ ಆವರಣ ಪ್ರವೇಶಿಸುತ್ತಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_11_tactical_1",
+        "category": "tactical",
+        "text": "ರೆಡ್ ಅಲರ್ಟ್ ಎಲ್ಲಾ ತಂಡಗಳು ಸುರಕ್ಷಿತ ಸ್ಥಳಕ್ಕೆ ತೆರಳಿ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_12_tactical_2",
+        "category": "tactical",
+        "text": "ವೈದ್ಯಕೀಯ ತಂಡವನ್ನು ಸೆಕ್ಟರ್ ಒಂಬತ್ತಕ್ಕೆ ಕಳುಹಿಸಲಾಗಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_13_tactical_3",
+        "category": "tactical",
+        "text": "ಆಮ್ಲಜನಕ ಮಟ್ಟ ನಲವತ್ತು ಪ್ರತಿಶತ ತಕ್ಷಣ ಹೊರಬನ್ನಿ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_14_tactical_4",
+        "category": "tactical",
+        "text": "ಗೋದಾಮು ಎರಡರಲ್ಲಿ ದಟ್ಟವಾದ ಹೊಗೆ ಕಾಣಿಸಿಕೊಂಡಿದೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_15_tactical_5",
+        "category": "tactical",
+        "text": "ಗಡಿ ಬೇಲಿ ಬಳಿ ಅನುಮಾನಾಸ್ಪದ ಚಟುವಟಿಕೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_16_coords_1",
+        "category": "coords",
+        "text": "ಅಕ್ಷಾಂಶ ಹನ್ನೆರಡು ಪಾಯಿಂಟ್ ಐದು ರೇಖಾಂಶ ಎಪ್ಪತ್ತೇಳು ಪಾಯಿಂಟ್ ಆರು",
+        "group": "medium"
+      },
+      {
+        "id": "kn_17_coords_2",
+        "category": "coords",
+        "text": "ಚೆಕ್‌ಪಾಯಿಂಟ್ ಡೆಲ್ಟಾ ಎತ್ತರ ಮುನ್ನೂರು ಮೀಟರ್",
+        "group": "medium"
+      },
+      {
+        "id": "kn_18_coords_3",
+        "category": "coords",
+        "text": "ಕಟ್ಟಡ ನಾಲ್ಕು ಕೊಠಡಿ ಸಂಖ್ಯೆ ಇಪ್ಪತ್ತೆಂಟು ಸುರಕ್ಷಿತ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_19_coords_4",
+        "category": "coords",
+        "text": "ವೇಗ ಮೂವತ್ತು ಕಿಲೋಮೀಟರ್ ಪ್ರತಿ ಗಂಟೆಗೆ ದಕ್ಷಿಣದ ಕಡೆ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_20_coords_5",
+        "category": "coords",
+        "text": "ರಿಲೇ ಟವರ್ ಐದು ಸಿಗ್ನಲ್ ಎಂಬತ್ತು ಪ್ರತಿಶತ",
+        "group": "medium"
+      },
+      {
+        "id": "kn_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "ಕಾನ್ವಾಯ್ ಆಲ್ಫಾ ಒಂದು ಬೇಸ್ ಬ್ರಾವೋಗೆ ವರದಿ ಮಾಡುತ್ತದೆ ಗ್ರಿಡ್ ಸಮನ್ವಯ ನಲವತ್ತೆರಡರ ಬಳಿ ಪಶ್ಚಿಮ ಬೇಲಿ ಮುರಿದಿದೆ ತುರ್ತು ವೈದ್ಯಕೀಯ ನೆರವು ಬೇಕು",
+        "group": "long"
+      },
+      {
+        "id": "kn_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "ಸ್ಟೇಷನ್ ಡೆಲ್ಟಾ ದೃಢಪಡಿಸುತ್ತದೆ ಸೆಕ್ಟರ್ ಮೂರರಲ್ಲಿ ಆಮ್ಲಜನಕ ಮಟ್ಟ ಮೂವತ್ತು ಪ್ರತಿಶತಕ್ಕೆ ಇಳಿದಿದೆ ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ ದಕ್ಷಿಣ ಗೇಟ್‌ಗೆ ತೆರಳಿ",
+        "group": "long"
+      },
+      {
+        "id": "kn_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "ಶೋಧನೆ ಮತ್ತು ರಕ್ಷಣಾ ತಂಡ ಹನ್ನೆರಡು ಪ್ರವಾಹ ಪೀಡಿತ ಪ್ರದೇಶಕ್ಕೆ ಮುನ್ನಡೆಯುತ್ತಿದೆ ನೀರಿನ ಮಟ್ಟ ಎರಡು ಮೀಟರ್ ಏರಿಕೆಯಾಗಿದ್ದು ದೋಣಿ ನಿಯೋಜಿಸಲಾಗಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "ತುರ್ತು ಎಚ್ಚರಿಕೆ ಕರಾವಳಿ ಸೆಕ್ಟರ್ ಏಳರಲ್ಲಿ ಭೀಕರ ಚಂಡಮಾರುತ ಅಪ್ಪಳಿಸುತ್ತಿದೆ ಗಾಳಿಯ ವೇಗ ಗಂಟೆಗೆ ಎಪ್ಪತ್ತು ಕಿಲೋಮೀಟರ್ ಜಾಗರೂಕರಾಗಿರಿ",
+        "group": "long"
+      },
+      {
+        "id": "kn_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "ಕಮಾಂಡ್ ಸೆಂಟರ್ ಎಲ್ಲಾ ಗಸ್ತು ತಂಡಗಳಿಗೆ ಪಶ್ಚಿಮ ಹೆದ್ದಾರಿ ಜಂಕ್ಷನ್ ನಾಲ್ಕಕ್ಕೆ ತಲುಪಲು ಮತ್ತು ರೇಡಿಯೋ ಸಂಪರ್ಕದಲ್ಲಿರಲು ಆದೇಶಿಸಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "ವೈದ್ಯಕೀಯ ನೆರವು ಕಾನ್ವಾಯ್ ಒಂಬತ್ತನೇ ಪರಿಹಾರ ಶಿಬಿರಕ್ಕೆ ತಲುಪಿದೆ ಆಹಾರ ಮತ್ತು ಪ್ರಥಮ ಚಿಕಿತ್ಸಾ ಸಾಮಗ್ರಿ ವಿತರಣೆ ಆರಂಭವಾಗಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "ರಿಲೇ ಟವರ್ ಮೂರರಲ್ಲಿ ವಿದ್ಯುತ್ ಸ್ಥಗಿತಗೊಂಡಿದೆ ಎಂದು ತಂಡ ತಿಳಿಸಿದೆ ಜನರೇಟರ್ ಚಾಲನೆ ಮಾಡಿ ಸಂಪರ್ಕ ಪುನಃಸ್ಥಾಪಿಸಲಾಗಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "ತಂಡ ಬ್ರಾವೋ ಅರಣ್ಯ ಮಾರ್ಗದ ಮೂಲಕ ಪಾಯಿಂಟ್ ಐದಕ್ಕೆ ಚಲಿಸುತ್ತಿದೆ ಯಾವುದೇ ಅನುಮಾನಾಸ್ಪದ ಚಟುವಟಿಕೆ ಇಲ್ಲ ಎಲ್ಲವೂ ಸುರಕ್ಷಿತ",
+        "group": "long"
+      },
+      {
+        "id": "kn_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "ನದಿಯ ಸೇತುವೆ ಭಾರೀ ವಾಹನಗಳಿಗೆ ಸುರಕ್ಷಿತವಲ್ಲ ಎಂದು ಎಂಜಿನಿಯರಿಂಗ್ ತಂಡ ತಿಳಿಸಿದೆ ಸಂಚಾರವನ್ನು ಪೂರ್ವಕ್ಕೆ ತಿರುಗಿಸಲಾಗಿದೆ",
+        "group": "long"
+      },
+      {
+        "id": "kn_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "ಎಲ್ಲಾ ಪ್ರಮುಖ ಚೆಕ್‌ಪೋಸ್ಟ್‌ಗಳು ಸುರಕ್ಷಿತವಾಗಿವೆ ಎಂದು ಮುಖ್ಯ ಕಚೇರಿ ಖಚಿತಪಡಿಸಿದೆ ರಾತ್ರಿ ಗಸ್ತು ತಂಡಗಳು ತಕ್ಷಣ ಕರ್ತವ್ಯಕ್ಕೆ ಹಾಜರಾಗಿ",
+        "group": "long"
+      }
+    ]
+  },
+  "ml": {
+    "language": "Malayalam",
+    "samples": [
+      {
+        "id": "ml_01_normal",
+        "category": "normal",
+        "text": "എല്ലാ പട്രോളിംഗ് ചെക്ക്പോസ്റ്റുകളും സുരക്ഷിതമാണെന്ന് റിപ്പോർട്ട് ചെയ്തിരിക്കുന്നു",
+        "group": "medium"
+      },
+      {
+        "id": "ml_02_short",
+        "category": "short",
+        "text": "റോജർ ബേസ്",
+        "group": "short"
+      },
+      {
+        "id": "ml_03_long",
+        "category": "long",
+        "text": "ഞങ്ങളുടെ സംഘം പടിഞ്ഞാറൻ ഹൈവേയിലൂടെ ജംഗ്ഷൻ ഏഴിലേക്ക് സാധാരണ പ്രോട്ടോക്കോൾ പ്രകാരം നീങ്ങുന്നു",
+        "group": "long"
+      },
+      {
+        "id": "ml_04_numbers",
+        "category": "numbers",
+        "text": "സംഘത്തിൽ പന്ത്രണ്ട് അംഗങ്ങളുണ്ട് ബാറ്ററി എഴുപത്തിയഞ്ച് ശതമാനമാണ്",
+        "group": "medium"
+      },
+      {
+        "id": "ml_05_location",
+        "category": "location",
+        "text": "സ്റ്റേഷൻ ആൽഫ പ്രധാന കവാടത്തിൽ നിന്ന് അമ്പത് മീറ്റർ വടക്കായി സ്ഥിതിചെയ്യുന്നു",
+        "group": "medium"
+      },
+      {
+        "id": "ml_06_emergency",
+        "category": "emergency",
+        "text": "അടിയന്തിര മുന്നറിയിപ്പ് സെക്ടർ നാലിൽ അടിയന്തിര സഹായം ആവശ്യമാണ്",
+        "group": "medium"
+      },
+      {
+        "id": "ml_07_radio",
+        "category": "radio",
+        "text": "റേഡിയോ പരിശോധന എന്റെ ശബ്ദം കേൾക്കാമോ ഓവർ",
+        "group": "medium"
+      },
+      {
+        "id": "ml_08_punct",
+        "category": "punct",
+        "text": "സ്ഥാനത്ത് തുടരുക അടുത്ത നിർദ്ദേശത്തിനായി കാത്തിരിക്കുക",
+        "group": "medium"
+      },
+      {
+        "id": "ml_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "ടീം ലീഡർ വിക്രം ബേസിൽ ക്യാപ്റ്റൻ ശർമ്മയെ കാണുക",
+        "group": "medium"
+      },
+      {
+        "id": "ml_10_fast",
+        "category": "fast",
+        "text": "വേഗത്തിലുള്ള വിവരം സംഘം ഇപ്പോൾ പരിസരത്ത് പ്രവേശിക്കുന്നു",
+        "group": "medium"
+      },
+      {
+        "id": "ml_11_tactical_1",
+        "category": "tactical",
+        "text": "റെഡ് അലേർട്ട് എല്ലാ ടീമുകളും സുരക്ഷിത സ്ഥാനത്തേക്ക് മാറുക",
+        "group": "medium"
+      },
+      {
+        "id": "ml_12_tactical_2",
+        "category": "tactical",
+        "text": "മെഡിക്കൽ ടീമിനെ സെക്ടർ ഒൻപതിലേക്ക് അയച്ചു",
+        "group": "medium"
+      },
+      {
+        "id": "ml_13_tactical_3",
+        "category": "tactical",
+        "text": "ഓക്സിജൻ അളവ് നാൽപ്പത് ശതമാനം ഉടൻ പുറത്തിറങ്ങുക",
+        "group": "medium"
+      },
+      {
+        "id": "ml_14_tactical_4",
+        "category": "tactical",
+        "text": "വെയർഹൗസ് രണ്ടിൽ കനത്ത പുക കാണപ്പെട്ടു",
+        "group": "medium"
+      },
+      {
+        "id": "ml_15_tactical_5",
+        "category": "tactical",
+        "text": "അതിർത്തി വേലിക്ക് സമീപം സംശയാസ്പദമായ ചലനം",
+        "group": "medium"
+      },
+      {
+        "id": "ml_16_coords_1",
+        "category": "coords",
+        "text": "അക്ഷാംശം പന്ത്രണ്ട് പോയിന്റ് അഞ്ച് രേഖാംശം എഴുപത്തിയേഴ് പോയിന്റ് ആറ്",
+        "group": "medium"
+      },
+      {
+        "id": "ml_17_coords_2",
+        "category": "coords",
+        "text": "ചെക്ക്പോയിന്റ് ഡെൽറ്റ ഉയരം മുന്നൂറ് മീറ്റർ",
+        "group": "medium"
+      },
+      {
+        "id": "ml_18_coords_3",
+        "category": "coords",
+        "text": "കെട്ടിടം നാല് മുറി നമ്പർ ഇരുപത്തിയെട്ട് സുരക്ഷിതം",
+        "group": "medium"
+      },
+      {
+        "id": "ml_19_coords_4",
+        "category": "coords",
+        "text": "വേഗത മണിക്കൂറിൽ മുപ്പത് കിലോമീറ്റർ തെക്ക് ഭാഗത്തേക്ക്",
+        "group": "medium"
+      },
+      {
+        "id": "ml_20_coords_5",
+        "category": "coords",
+        "text": "റിലേ ടവർ അഞ്ച് സിഗ്നൽ എൺപത് ശതമാനം",
+        "group": "medium"
+      },
+      {
+        "id": "ml_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "കോൺവോയ് ആൽഫ ഒന്ന് ബേസ് ബ്രാവോയെ അറിയിക്കുന്നു ഗ്രിഡ് കോർഡിനേറ്റ് നാൽപ്പത്തിരണ്ടിന് സമീപം പടിഞ്ഞാറൻ വേലി തകർന്നു അടിയന്തര ചികിത്സ സഹായം വേണം",
+        "group": "long"
+      },
+      {
+        "id": "ml_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "സ്റ്റേഷൻ ഡെൽറ്റ സ്ഥിരീകരിക്കുന്നു സെക്ടർ മൂന്നിൽ ഓക്സിജൻ നില മുപ്പത് ശതമാനമായി കുറഞ്ഞു എല്ലാ ജീവനക്കാരും തെക്കൻ ഗേറ്റിലേക്ക് മാറുക",
+        "group": "long"
+      },
+      {
+        "id": "ml_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "തിരച്ചിൽ രക്ഷാസംഘം പന്ത്രണ്ട് വെള്ളപ്പൊക്ക പ്രദേശത്തേക്ക് നീങ്ങുന്നു വെള്ളം രണ്ട് മീറ്റർ ഉയർന്നു ബോട്ടുകൾ സജ്ജമാക്കിയിട്ടുണ്ട്",
+        "group": "long"
+      },
+      {
+        "id": "ml_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "അടിയന്തര മുന്നറിയിപ്പ് തീരദേശ സെക്ടർ ഏഴിൽ കനത്ത കാറ്റും മഴയും വീശുന്നു കാറ്റിന്റെ വേഗത എഴുപത് കിലോമീറ്റർ സുരക്ഷിതമായി ഇരിക്കുക",
+        "group": "long"
+      },
+      {
+        "id": "ml_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "കമാൻഡ് സെന്റർ പട്രോളിംഗ് സംഘത്തോട് പടിഞ്ഞാറൻ ഹൈവേ ജംഗ്ഷൻ നാലിൽ എത്താനും റേഡിയോ ബന്ധം നിലനിർത്താനും നിർദ്ദേശിക്കുന്നു",
+        "group": "long"
+      },
+      {
+        "id": "ml_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "വൈദ്യസഹായ സംഘം ക്യാമ്പ് ഒമ്പതിൽ എത്തിച്ചേർന്നു ഭക്ഷണവും പ്രഥമശുശ്രൂഷാ സാമഗ്രികളും വിതരണം ചെയ്യാൻ തുടങ്ങി",
+        "group": "long"
+      },
+      {
+        "id": "ml_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "റിലേ ടവർ മൂന്നിൽ വൈദ്യുതി തടസ്സപ്പെട്ടു എന്ന് റിപ്പോർട്ട് ബാക്കപ്പ് ജനറേറ്റർ പ്രവർത്തിപ്പിച്ച് ബന്ധം പുനഃസ്ഥാപിച്ചു",
+        "group": "long"
+      },
+      {
+        "id": "ml_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "സൈനിക സംഘം വനപാതയിലൂടെ പോയിന്റ് അഞ്ചിലേക്ക് നീങ്ങുന്നു സംശയാസ്പദമായ ഒന്നും കണ്ടില്ല എല്ലാം സുരക്ഷിതമാണ്",
+        "group": "long"
+      },
+      {
+        "id": "ml_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "നദിക്ക് കുറുകെയുള്ള പാലം വലിയ വാഹനങ്ങൾക്ക് സുരക്ഷിതമല്ലെന്ന് എൻജിനീയറിങ് ടീം അറിയിച്ചു ഗതാഗതം കിഴക്കോട്ട് തിരിച്ചുവിട്ടു",
+        "group": "long"
+      },
+      {
+        "id": "ml_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "എല്ലാ പ്രധാന ചെക്ക്‌പോസ്റ്റുകളും സുരക്ഷിതമാണെന്ന് ആസ്ഥാനത്ത് സ്ഥിരീകരിച്ചു രാത്രി പട്രോളിംഗ് സംഘം ഉടൻ ചുമതല ഏൽക്കുക",
+        "group": "long"
+      }
+    ]
+  },
+  "ta": {
+    "language": "Tamil",
+    "samples": [
+      {
+        "id": "ta_01_normal",
+        "category": "normal",
+        "text": "அனைத்து ரோந்து சோதனைச் சாவடிகளும் பாதுகாப்பாக உள்ளன",
+        "group": "medium"
+      },
+      {
+        "id": "ta_02_short",
+        "category": "short",
+        "text": "ரோஜர் பேஸ்",
+        "group": "short"
+      },
+      {
+        "id": "ta_03_long",
+        "category": "long",
+        "text": "எங்கள் குழு மேற்கு நெடுஞ்சாலை வழியாக சந்திப்பு ஏழு நோக்கி நிலையான நெறிமுறைகளின்படி செல்கிறது",
+        "group": "long"
+      },
+      {
+        "id": "ta_04_numbers",
+        "category": "numbers",
+        "text": "குழுவில் பன்னிரண்டு உறுப்பினர்கள் உள்ளனர் மற்றும் பேட்டரி எழுபத்தைந்து சதவீதம் உள்ளது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_05_location",
+        "category": "location",
+        "text": "நிலையம் ஆல்பா பிரதான வாயிலில் இருந்து ஐம்பது மீட்டர் வடக்கே அமைந்துள்ளது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_06_emergency",
+        "category": "emergency",
+        "text": "அவசர எச்சரிக்கை பிரிவு நான்கில் உடனடி உதவி தேவைப்படுகிறது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_07_radio",
+        "category": "radio",
+        "text": "ரேடியோ சோதனை என் குரல் கேட்கிறதா ஓவர்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_08_punct",
+        "category": "punct",
+        "text": "அங்கேயே இருங்கள் அடுத்த உத்தரவுக்காக காத்திருங்கள்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "குழு தலைவர் விக்ரம் தளத்தில் கேப்டன் சர்மாவை சந்திக்கவும்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_10_fast",
+        "category": "fast",
+        "text": "விரைவான தகவல் குழு இப்போது வளாகத்திற்குள் நுழைகிறது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_11_tactical_1",
+        "category": "tactical",
+        "text": "ரெட் அலர்ட் அனைத்து குழுக்களும் பாதுகாப்பான இடத்திற்கு செல்லவும்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_12_tactical_2",
+        "category": "tactical",
+        "text": "மருத்துவக் குழு பிரிவு ஒன்பதுக்கு அனுப்பப்பட்டுள்ளது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_13_tactical_3",
+        "category": "tactical",
+        "text": "ஆக்சிஜன் அளவு நாற்பது சதவீதம் உடனடியாக வெளியேறவும்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_14_tactical_4",
+        "category": "tactical",
+        "text": "கிடங்கு இரண்டில் அடர்ந்த புகை காணப்பட்டது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_15_tactical_5",
+        "category": "tactical",
+        "text": "எல்லை வேலி அருகே சந்தேகத்திற்கிடமான நடமாட்டம்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_16_coords_1",
+        "category": "coords",
+        "text": "அட்சரேகை பன்னிரண்டு புள்ளி ஐந்து தீர்க்கரேகை எழுபத்தேழு புள்ளி ஆறு",
+        "group": "medium"
+      },
+      {
+        "id": "ta_17_coords_2",
+        "category": "coords",
+        "text": "சோதனைச் சாவடி டெல்டா உயரம் முந்நூறு மீட்டர்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_18_coords_3",
+        "category": "coords",
+        "text": "கட்டிடம் நான்கு அறை எண் இருபத்தெட்டு பாதுகாப்பானது",
+        "group": "medium"
+      },
+      {
+        "id": "ta_19_coords_4",
+        "category": "coords",
+        "text": "வேகம் மணிக்கு முப்பது கிலோமீட்டர் தெற்கு நோக்கி",
+        "group": "medium"
+      },
+      {
+        "id": "ta_20_coords_5",
+        "category": "coords",
+        "text": "ரிலே கோபுரம் ஐந்து சமிக்ஞை எண்பது சதவீதம்",
+        "group": "medium"
+      },
+      {
+        "id": "ta_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "வாகன அணிவகுப்பு ஆல்பா ஒன்று தளம் பிராவோவுக்கு தெரிவிக்கிறது கட்டம் ஒருங்கிணைப்பு நாற்பத்திரண்டு அருகே மேற்கு வேலி உடைந்தது அவசர மருத்துவ உதவி தேவை",
+        "group": "long"
+      },
+      {
+        "id": "ta_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "நிலையம் டெல்டா உறுதிப்படுத்துகிறது பிரிவு மூன்றில் ஆக்ஸிஜன் அளவு முப்பது சதவீதமாக குறைந்துள்ளது அனைத்து ஊழியர்களும் தெற்கு வாயிலுக்கு செல்லவும்",
+        "group": "long"
+      },
+      {
+        "id": "ta_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "தேடுதல் மீட்புக் குழு பன்னிரண்டு வெள்ளப் பகுதிக்கு செல்கிறது நீர்மட்டம் இரண்டு மீட்டர் உயர்ந்துள்ளது படகுகள் நிலைநிறுத்தப்பட்டுள்ளன",
+        "group": "long"
+      },
+      {
+        "id": "ta_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "அவசர எச்சரிக்கை கடலோரப் பிரிவு ஏழில் கடுமையான புயல் வீசுகிறது காற்றின் வேகம் எழுபது கிலோமீட்டர் அனைவரும் பாதுகாப்பாக இருக்கவும்",
+        "group": "long"
+      },
+      {
+        "id": "ta_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "கட்டளை மையம் ரோந்து குழுக்களை மேற்கு நெடுஞ்சாலை சந்திப்பு நான்கிற்கு சென்று வானொலி தொடர்பில் இருக்குமாறு உத்தரவிடுகிறது",
+        "group": "long"
+      },
+      {
+        "id": "ta_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "மருத்துவ நிவாரண வாகனங்கள் முகாம் ஒன்பதை அடைந்துள்ளன உணவு மற்றும் முதலுதவி பொருட்கள் விநியோகம் தொடங்கப்பட்டுள்ளது",
+        "group": "long"
+      },
+      {
+        "id": "ta_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "கோபுரம் மூன்றில் மின்சாரம் தடைபட்டுள்ளது என பாதுகாப்பு குழு தெரிவித்தது ஜெனரேட்டர்கள் இயக்கப்பட்டு தொடர்பு மீட்டெடுக்கப்பட்டது",
+        "group": "long"
+      },
+      {
+        "id": "ta_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "பிரிவு பிராவோ காட்டுப் பாதை வழியாக புள்ளி ஐந்துக்கு முன்னேறுகிறது எந்தவித சந்தேகத்திற்கிடமான நடவடிக்கையும் இல்லை",
+        "group": "long"
+      },
+      {
+        "id": "ta_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "ஆற்றுப் பாலம் கனரக வாகனங்களுக்கு பாதுகாப்பற்றது என பொறியியல் குழு தெரிவித்துள்ளது போக்குவரத்து கிழக்கு நோக்கி திருப்பப்பட்டுள்ளது",
+        "group": "long"
+      },
+      {
+        "id": "ta_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "அனைத்து சோதனைச் சாவடிகளும் பாதுகாப்பாக இருப்பதாக தலைமையகம் உறுதிப்படுத்தியுள்ளது இரவு ரோந்து குழுவினர் உடனடியாக பொறுப்பேற்கவும்",
+        "group": "long"
+      }
+    ]
+  },
+  "or": {
+    "language": "Odia",
+    "samples": [
+      {
+        "id": "or_01_normal",
+        "category": "normal",
+        "text": "ସମସ୍ତ ପାଟ୍ରୋଲିଂ ଚେକପୋଷ୍ଟ ସୁରକ୍ଷିତ ଥିବା ସୂଚନା ମିଳିଛି",
+        "group": "medium"
+      },
+      {
+        "id": "or_02_short",
+        "category": "short",
+        "text": "ରଜର ବେସ",
+        "group": "short"
+      },
+      {
+        "id": "or_03_long",
+        "category": "long",
+        "text": "ଆମର ଦଳ ପଶ୍ଚିମ ରାଜପଥ ଦେଇ ଜଙ୍କସନ ସାତ ଆଡକୁ ସାଧାରଣ ନିୟମ ଅନୁଯାୟୀ ଆଗକୁ ବଢୁଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_04_numbers",
+        "category": "numbers",
+        "text": "ଦଳରେ ବାର ଜଣ ସଦସ୍ୟ ଅଛନ୍ତି ଏବଂ ବ୍ୟାଟେରୀ ପଞ୍ଚସ୍ତରୀ ପ୍ରତିଶତ ଅଛି",
+        "group": "medium"
+      },
+      {
+        "id": "or_05_location",
+        "category": "location",
+        "text": "ଷ୍ଟେସନ ଆଲଫା ମୁଖ୍ୟ ଫାଟକରୁ ପଚାଶ ମିଟର ଉତ୍ତରରେ ଅବସ୍ଥିତ",
+        "group": "medium"
+      },
+      {
+        "id": "or_06_emergency",
+        "category": "emergency",
+        "text": "ଜରୁରୀକାଳୀନ ଚେତାବନୀ ସେକ୍ଟର ଚାରିରେ ତୁରନ୍ତ ସହାୟତା ଆବଶ୍ୟକ",
+        "group": "medium"
+      },
+      {
+        "id": "or_07_radio",
+        "category": "radio",
+        "text": "ରେଡିଓ ଯାଞ୍ଚ ଆପଣ ମୋ ସ୍ୱର ଶୁଣିପାରୁଛନ୍ତି କି ଓଭର",
+        "group": "medium"
+      },
+      {
+        "id": "or_08_punct",
+        "category": "punct",
+        "text": "ସେହି ସ୍ଥାନରେ ରୁହନ୍ତୁ ପରବର୍ତ୍ତୀ ଆଦେଶ ପାଇଁ ଅପେକ୍ଷା କରନ୍ତୁ",
+        "group": "medium"
+      },
+      {
+        "id": "or_09_proper_nouns",
+        "category": "proper_nouns",
+        "text": "ଦଳ ନେତା ବିକ୍ରମ ବେସରେ କ୍ୟାପଟେନ ଶର୍ମାଙ୍କୁ ଭେଟନ୍ତୁ",
+        "group": "medium"
+      },
+      {
+        "id": "or_10_fast",
+        "category": "fast",
+        "text": "ତ୍ୱରିତ ସୂଚନା ଟିମ ଏବେ ପରିସର ମଧ୍ୟକୁ ପ୍ରବେଶ କରୁଛି",
+        "group": "medium"
+      },
+      {
+        "id": "or_11_tactical_1",
+        "category": "tactical",
+        "text": "ରେଡ ଆଲର୍ଟ ସମସ୍ତ ଟିମ ସୁରକ୍ଷିତ ସ୍ଥାନକୁ ଫେରିଯାଆନ୍ତୁ",
+        "group": "medium"
+      },
+      {
+        "id": "or_12_tactical_2",
+        "category": "tactical",
+        "text": "ମେଡିକାଲ ଟିମକୁ ସେକ୍ଟର ନଅକୁ ପଠାଯାଇଛି",
+        "group": "medium"
+      },
+      {
+        "id": "or_13_tactical_3",
+        "category": "tactical",
+        "text": "ଅକ୍ସିଜେନ ସ୍ତର ଚାଳିଶ ପ୍ରତିଶତ ତୁରନ୍ତ ବାହାରକୁ ଆସନ୍ତୁ",
+        "group": "medium"
+      },
+      {
+        "id": "or_14_tactical_4",
+        "category": "tactical",
+        "text": "ଗୋଦାମ ଦୁଇରେ ପ୍ରବଳ ଧୂଆଁ ଦେଖାଯାଇଛି",
+        "group": "medium"
+      },
+      {
+        "id": "or_15_tactical_5",
+        "category": "tactical",
+        "text": "ସୀମା ବାଡ଼ ପାଖରେ ସନ୍ଦିଗ୍ଧ ଗତିବିଧି",
+        "group": "medium"
+      },
+      {
+        "id": "or_16_coords_1",
+        "category": "coords",
+        "text": "ଅକ୍ଷାଂଶ ବାର ଦଶମିକ ପାଞ୍ଚ ଦ୍ରାଘିମା ସତସ୍ତରୀ ଦଶମିକ ଛଅ",
+        "group": "medium"
+      },
+      {
+        "id": "or_17_coords_2",
+        "category": "coords",
+        "text": "ଚେକପଏଣ୍ଟ ଡେଲଟା ଉଚ୍ଚତା ତିନିଶହ ମିଟର",
+        "group": "medium"
+      },
+      {
+        "id": "or_18_coords_3",
+        "category": "coords",
+        "text": "ବିଲଡିଂ ଚାରି ରୁମ ନମ୍ବର ଅଠେଇଶ ସୁରକ୍ଷିତ",
+        "group": "medium"
+      },
+      {
+        "id": "or_19_coords_4",
+        "category": "coords",
+        "text": "ଗତି ତିରିଶ କିଲୋମିଟର ଘଣ୍ଟା ପ୍ରତି ଦକ୍ଷିଣ ଦିଗକୁ",
+        "group": "medium"
+      },
+      {
+        "id": "or_20_coords_5",
+        "category": "coords",
+        "text": "ରିଲେ ଟାୱାର ପାଞ୍ଚ ସିଗନାଲ ଅଶୀ ପ୍ରତିଶତ",
+        "group": "medium"
+      },
+      {
+        "id": "or_21_long_tactical_1",
+        "category": "long_tactical",
+        "text": "କନଭୟ ଆଲଫା ଏକ ବେସ ବ୍ରାଭୋକୁ ଜଣାଉଛି ଗ୍ରୀଡ ସମନ୍ୱୟ ବୟାଳିଶ ପାଖରେ ପଶ୍ଚିମ ବାଡ଼ ଭାଙ୍ଗିଯାଇଛି ତୁରନ୍ତ ଚିକିତ୍ସା ସାହାଯ୍ୟ ଆବଶ୍ୟକ",
+        "group": "long"
+      },
+      {
+        "id": "or_22_long_tactical_2",
+        "category": "long_tactical",
+        "text": "ଷ୍ଟେସନ ଡେଲଟା ନିଶ୍ଚିତ କରୁଛି ସେକ୍ଟର ତିନିରେ ଅମ୍ଳଜାନ ସ୍ତର ତିରିଶ ପ୍ରତିଶତକୁ ଖସିଆସିଛି ସମସ୍ତ କର୍ମଚାରୀ ଦକ୍ଷିଣ ଗେଟକୁ ଯାଆନ୍ତୁ",
+        "group": "long"
+      },
+      {
+        "id": "or_23_long_tactical_3",
+        "category": "long_tactical",
+        "text": "ସନ୍ଧାନ ଓ ଉଦ୍ଧାରକାରୀ ଦଳ ବାର ବନ୍ୟା ପ୍ରଭାବିତ ଅଞ୍ଚଳକୁ ଯାଉଛି ଜଳସ୍ତର ଦୁଇ ମିଟର ବୃଦ୍ଧି ପାଇଛି ଡଙ୍ଗା ମୁତୟନ କରାଯାଇଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_24_long_tactical_4",
+        "category": "long_tactical",
+        "text": "ଜରୁରୀ ସତର୍କତା ଉପକୂଳ ସେକ୍ଟର ସାତରେ ଭୀଷଣ ଝଡ଼ ମାଡ଼ିଆସୁଛି ପବନର ବେଗ ସତୁରି କିଲୋମିଟର ସମସ୍ତେ ସୁରକ୍ଷିତ ରୁହନ୍ତୁ",
+        "group": "long"
+      },
+      {
+        "id": "or_25_long_tactical_5",
+        "category": "long_tactical",
+        "text": "କମାଣ୍ଡ ସେଣ୍ଟର ସମସ୍ତ ପାଟ୍ରୋଲିଂ ଦଳକୁ ପଶ୍ଚିମ ରାଜପଥ ଛକ ଚାରିକୁ ଯିବାକୁ ଏବଂ ରେଡିଓ ଯୋଗାଯୋଗ ରଖିବାକୁ ନିର୍ଦ୍ଦେଶ ଦେଉଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_26_long_tactical_6",
+        "category": "long_tactical",
+        "text": "ଡାକ୍ତରୀ ସାହାଯ୍ୟ କନଭୟ ରିଲିଫ ଶିବିର ନଅରେ ପହଞ୍ଚିଛି ଖାଦ୍ୟ ଏବଂ ପ୍ରାଥମିକ ଚିକିତ୍ସା ସାମଗ୍ରୀ ବଣ୍ଟନ ଆରମ୍ଭ ହୋଇଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_27_long_tactical_7",
+        "category": "long_tactical",
+        "text": "ରିଲେ ଟାୱାର ତିନିରେ ବିଦ୍ୟୁତ ସରବରାହ ବନ୍ଦ ଥିବା ସୂଚନା ମିଳିଛି ଜେନେରେଟର ଚାଲୁ କରି ଯୋଗାଯୋଗ ପୁନଃସ୍ଥାପିତ ହୋଇଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_28_long_tactical_8",
+        "category": "long_tactical",
+        "text": "ଦଳ ବ୍ରାଭୋ ଜଙ୍ଗଲ ରାସ୍ତା ଦେଇ ପଏଣ୍ଟ ପାଞ୍ଚ ଆଡ଼କୁ ବଢ଼ୁଛି କୌଣସି ଅସୁବିଧା ନାହିଁ ସବୁ ସୁରକ୍ଷିତ ଅଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_29_long_tactical_9",
+        "category": "long_tactical",
+        "text": "ଇଞ୍ଜିନିୟରିଂ ଦଳ ନଦୀ ପୋଲକୁ ଭାରୀ ଯାନ ପାଇଁ ବିପଜ୍ଜନକ ଘୋଷଣା କରିଛି ସମସ୍ତ ଯାତାୟାତ ପୂର୍ବ ଦିଗକୁ ବଦଳାଯାଇଛି",
+        "group": "long"
+      },
+      {
+        "id": "or_30_long_tactical_10",
+        "category": "long_tactical",
+        "text": "ମୁଖ୍ୟ କାର୍ଯ୍ୟାଳୟ ନିଶ୍ଚିତ କରୁଛି ସବୁ ମୁଖ୍ୟ ଫାଟକ ସୁରକ୍ଷିତ ଅଛି ରାତ୍ରୀ ପାଟ୍ରୋଲିଂ ଦଳ ତୁରନ୍ତ ଦାୟିତ୍ୱ ଗ୍ରହଣ କରନ୍ତୁ",
+        "group": "long"
+      }
+    ]
+  }
+}

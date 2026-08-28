@@ -18,7 +18,9 @@ import kotlin.system.measureTimeMillis
  * for non-autoregressive Wav2Vec2 CTC models (Hindi, Gujarati, Telugu, Kannada).
  */
 class GenericOnnxCtcSttEngine(
-    override val language: SupportedLanguage
+    override val language: SupportedLanguage,
+    private val customModelPath: String? = null,
+    private val customVocabPath: String? = null
 ) : SttEngine {
 
     companion object {
@@ -46,11 +48,17 @@ class GenericOnnxCtcSttEngine(
             Log.i(TAG, "Initializing GenericOnnxCtcSttEngine for ${language.displayName} (${language.nativeName})...")
 
             // 1. Resolve and load vocabulary
-            vocab = loadVocabulary(context, language.vocabOrTokensAssetPath)
+            val vocabTarget = customVocabPath ?: language.vocabOrTokensAssetPath
+            vocab = loadVocabulary(context, vocabTarget)
             Log.i(TAG, "Loaded vocabulary for ${language.displayName} with ${vocab.size} tokens.")
 
             // 2. Resolve model file (check filesDir, check /data/local/tmp, or extract from assets)
-            val modelFile = resolveModelFile(context, language.modelAssetPath)
+            val modelFile = if (!customModelPath.isNullOrBlank()) {
+                val f = File(customModelPath)
+                if (f.exists()) f else resolveModelFile(context, customModelPath)
+            } else {
+                resolveModelFile(context, language.modelAssetPath)
+            }
             if (!modelFile.exists() || modelFile.length() == 0L) {
                 return@withContext Result.failure(IllegalStateException("Model file not found at ${modelFile.absolutePath}"))
             }

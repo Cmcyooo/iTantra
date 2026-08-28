@@ -1,0 +1,6 @@
+timestamp,device,android_version,category,samples_tested,avg_text_bytes,avg_packet_bytes,avg_audio_pcm_bytes,avg_data_reduction_pct,avg_send_latency_ms,avg_ack_rtt_ms,duplicate_filtering_pct,retry_recovery_pct,verdict
+1787940424013,Redmi Note 9 Pro,12,SHORT_ALERT,1,16,182,48000,99.62,4,6,100.0,100.0,EXCELLENT (>99% REDUCTION)
+1787940424018,Redmi Note 9 Pro,12,NORMAL_STATUS,1,58,224,112000,99.80,3,7,100.0,100.0,EXCELLENT (>99% REDUCTION)
+1787940424023,Redmi Note 9 Pro,12,COORDINATES,1,75,241,144000,99.83,3,7,100.0,100.0,EXCELLENT (>99% REDUCTION)
+1787940424028,Redmi Note 9 Pro,12,LONG_DISPATCH,1,113,279,256000,99.89,3,6,100.0,100.0,EXCELLENT (>99% REDUCTION)
+1787940424033,Redmi Note 9 Pro,12,EMERGENCY_BROADCAST,1,99,265,208000,99.87,3,7,100.0,100.0,EXCELLENT (>99% REDUCTION)
