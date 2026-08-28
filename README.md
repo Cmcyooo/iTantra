@@ -1278,3 +1278,35 @@ Android Edge Inference
 ```
 
 **🚧 Active Development**
+## 🔗 Open-Source Technologies & References
+
+### AI4Bharat IndicConformer
+Open-source Indian-language speech recognition models covering multiple Indian languages.
+
+https://github.com/AI4Bharat/IndicConformerASR
+
+License: MIT
+
+### ONNX Runtime
+Open-source cross-platform machine-learning inference runtime used for local Android inference.
+
+https://github.com/microsoft/onnxruntime
+
+License: MIT
+
+### sherpa-onnx
+Open-source speech-processing framework with Android support and fully local/offline speech recognition.
+
+https://github.com/k2-fsa/sherpa-onnx
+
+### Silero VAD
+Open-source voice activity detector used for speech/silence detection.
+
+https://github.com/snakers4/silero-vad
+
+License: MIT
+
+### IndiaAI / AIKosh — IndicConformer
+Official IndiaAI model reference for Indic-Conformer ASR.
+
+https://aikosh.indiaai.gov.in/home/models/details/indic_conformer_model_for_asr.html
