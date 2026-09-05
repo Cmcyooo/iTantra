@@ -1277,36 +1277,84 @@ Emergency Communication
 Android Edge Inference
 ```
 
-**🚧 Active Development**
-## 🔗 Open-Source Technologies & References
+iTANTRA --- Research & References
 
-### AI4Bharat IndicConformer
-Open-source Indian-language speech recognition models covering multiple Indian languages.
+Research and Technology References
 
-https://github.com/AI4Bharat/IndicConformerASR
+The following research papers, open-source projects, and official
+Android documentation were used as references during the design and
+development of iTANTRA --- Indian Multilingual TTS & STT Aided Neural
+Transceiver for Low-Bitrate Links.
 
-License: MIT
+Speech Recognition
 
-### ONNX Runtime
-Open-source cross-platform machine-learning inference runtime used for local Android inference.
+Vakyansh --- ASR Toolkit for Low Resource Indic Languages
+https://arxiv.org/abs/2203.16512
 
-https://github.com/microsoft/onnxruntime
+Whisper --- Robust Speech Recognition via Large-Scale Weak
+Supervision
+https://arxiv.org/abs/2212.04356
 
-License: MIT
+Voice Activity Detection
 
-### sherpa-onnx
-Open-source speech-processing framework with Android support and fully local/offline speech recognition.
-
-https://github.com/k2-fsa/sherpa-onnx
-
-### Silero VAD
-Open-source voice activity detector used for speech/silence detection.
-
+Silero VAD --- Voice Activity Detection
 https://github.com/snakers4/silero-vad
 
-License: MIT
+Speech Processing & Inference
 
-### IndiaAI / AIKosh — IndicConformer
-Official IndiaAI model reference for Indic-Conformer ASR.
+ONNX Runtime --- Machine Learning Inference Runtime
+https://github.com/microsoft/onnxruntime
 
-https://aikosh.indiaai.gov.in/home/models/details/indic_conformer_model_for_asr.html
+sherpa-onnx --- Offline Speech Processing Toolkit
+https://github.com/k2-fsa/sherpa-onnx
+
+Text-to-Speech
+
+Piper --- Fast Local Neural Text-to-Speech
+https://github.com/OHF-voice/piper1-gpl
+
+Android Communication
+
+Android Wi-Fi Direct / Wi-Fi P2P
+https://developer.android.com/develop/connectivity/wifi/wifip2p
+
+Android Bluetooth
+https://developer.android.com/develop/connectivity/bluetooth
+
+Project Repository
+
+iTANTRA --- Source Code and Project Documentation
+
+https://github.com/Cmcyooo/iTantra
+
+Reference-to-Implementation Mapping
+
+Reference              Role in iTANTRA
+
+Vakyansh               Indic-language speech recognition
+Whisper                English speech recognition
+Silero VAD             Speech/silence detection before STT
+ONNX Runtime           Local/mobile neural-network inference
+sherpa-onnx            Offline speech-processing deployment
+Piper                  Local neural text-to-speech
+Android Wi-Fi Direct   Nearby peer-to-peer communication
+Android Bluetooth      Local fallback peer-to-peer communication
+
+Core System Concept
+
+iTANTRA keeps speech processing on the device:
+
+Speech → VAD → Offline STT → Text + Metadata → Local Link → Text +
+Metadata → Offline TTS → Speech
+
+Only the compact text message and required metadata are transmitted
+between peer devices; raw speech audio is not transmitted.
+
+Acknowledgement
+
+iTANTRA builds upon the research, open-source software, models, and
+platform capabilities referenced above. The project combines these
+technologies into an offline multilingual communication system designed
+for low-connectivity and emergency communication scenarios.
+
+Transmit the message, not the waveform.
