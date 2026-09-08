@@ -14,14 +14,20 @@
 
 ---
 
-### 📦 Download iTantra v1.0.0
+### 📦 Modular Distribution & Download (v1.0.0)
 
-Download the signed release APKs from the [GitHub Releases](https://github.com/Cmcyooo/iTantra/releases) page:
+iTantra uses a **Modular Language Pack Architecture** so users download only a lightweight **Base APK (~95 MB)** and select only the language packs they need.
 
-- **Recommended:** `app-arm64-v8a-release.apk` (**~514 MB**) — Recommended for modern Android phones (ARM 64-bit architecture).
-- **Universal:** `app-universal-release.apk` (**~550 MB**) — Universal build containing native libraries for all CPU architectures (ARM64, ARMv7, x86_64, x86).
+**Workflow:**
+> **Install iTantra Base APK → Choose Languages → Download / Import Language Packs → Use 100% Offline**
 
-> **Note:** All 10 supported languages (Hindi, Gujarati, Marathi, Kannada, Malayalam, Tamil, Telugu, Odia, Bengali, English) and required offline AI models (VAD, STT, TTS, LID) are packaged directly inside the APK for 100% offline operation with zero internet required.
+Download artifacts from [GitHub Releases](https://github.com/Cmcyooo/iTantra/releases):
+
+- **Recommended Base APK:** `app-arm64-v8a-release.apk` (**~95.6 MB**) — Base application containing iTantra UI, PTT engine, Silero VAD, Auto-LID, transports, and Language Pack Manager for ARM64 Android devices.
+- **Universal Base APK:** `app-universal-release.apk` (**~135 MB**) — Base application supporting all CPU architectures (ARM64, ARMv7, x86_64, x86).
+- **Language Packs (`langpack_{code}.zip`)**: Modular model archives containing offline STT & TTS models (~80 MB per language). Can be downloaded in-app or imported offline via SD card / USB.
+
+> **Offline Guarantee:** Once a language pack is installed or imported, all speech recognition and synthesis for that language operates **100% offline** with zero internet or cloud dependencies.
 
 ---
 

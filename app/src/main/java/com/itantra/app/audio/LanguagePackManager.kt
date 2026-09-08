@@ -53,18 +53,18 @@ class LanguagePackManager private constructor(private val context: Context) {
             }
         }
 
-        // Expected download/storage estimates for 10 languages
+        // Expected download/storage estimates for 10 languages (STT + TTS)
         val PACK_METADATA: Map<SupportedLanguage, Pair<Long, Long>> = mapOf(
             SupportedLanguage.ENGLISH to Pair(120_000_000L, 175_000_000L),
-            SupportedLanguage.HINDI to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.GUJARATI to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.MARATHI to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.KANNADA to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.MALAYALAM to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.TAMIL to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.TELUGU to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.ODIA to Pair(80_000_000L, 123_000_000L),
-            SupportedLanguage.BENGALI to Pair(80_000_000L, 123_000_000L)
+            SupportedLanguage.HINDI to Pair(138_000_000L, 186_000_000L),
+            SupportedLanguage.GUJARATI to Pair(185_000_000L, 236_000_000L),
+            SupportedLanguage.MARATHI to Pair(151_000_000L, 199_000_000L),
+            SupportedLanguage.KANNADA to Pair(185_000_000L, 236_000_000L),
+            SupportedLanguage.MALAYALAM to Pair(138_000_000L, 185_000_000L),
+            SupportedLanguage.TAMIL to Pair(138_000_000L, 186_000_000L),
+            SupportedLanguage.TELUGU to Pair(138_000_000L, 185_000_000L),
+            SupportedLanguage.ODIA to Pair(185_000_000L, 236_000_000L),
+            SupportedLanguage.BENGALI to Pair(151_000_000L, 199_000_000L)
         )
     }
 
@@ -83,7 +83,7 @@ class LanguagePackManager private constructor(private val context: Context) {
         for (lang in SupportedLanguage.entries) {
             val installed = checkIsPackInstalled(lang)
             val size = getInstalledSize(lang)
-            val meta = PACK_METADATA[lang] ?: Pair(80_000_000L, 123_000_000L)
+            val meta = PACK_METADATA[lang] ?: Pair(138_000_000L, 185_000_000L)
             
             val currentStatus = _packStatuses.value[lang]
             newMap[lang] = LanguagePackStatus(
@@ -99,35 +99,63 @@ class LanguagePackManager private constructor(private val context: Context) {
     }
 
     /**
-     * Checks if the language pack models exist either in context.filesDir or assets.
+     * Checks if the complete language pack (STT + TTS models) exists in context.filesDir or assets.
      */
     fun isPackInstalled(lang: SupportedLanguage): Boolean {
         return checkIsPackInstalled(lang)
     }
 
     private fun checkIsPackInstalled(lang: SupportedLanguage): Boolean {
-        val modelFileInStorage = File(context.filesDir, lang.modelAssetPath)
-        if (modelFileInStorage.exists() && modelFileInStorage.length() > 10 * 1024 * 1024) {
+        // 1. Verify STT Model & Vocab
+        val sttModelInStorage = File(context.filesDir, lang.modelAssetPath)
+        val sttVocabInStorage = File(context.filesDir, lang.vocabOrTokensAssetPath)
+
+        val hasSttInStorage = sttModelInStorage.exists() && 
+                sttModelInStorage.length() > 10 * 1024 * 1024 && 
+                sttVocabInStorage.exists()
+
+        // 2. Verify TTS Model
+        val ttsVoice = TtsVoiceConfig.getConfigFor(lang)
+        val ttsModelInStorage = File(context.filesDir, "${ttsVoice.modelDirName}/model.onnx")
+        val hasTtsInStorage = ttsModelInStorage.exists() && ttsModelInStorage.length() > 10 * 1024 * 1024
+
+        if (hasSttInStorage && hasTtsInStorage) {
             return true
         }
 
-        // Check if model file exists in assets (e.g., if bundled)
+        // Check if bundled in assets (e.g., if base English is bundled)
+        val hasSttInAssets = isAssetFilePresent(lang.modelAssetPath)
+        val hasTtsInAssets = isAssetFilePresent("${ttsVoice.modelDirName}/model.onnx")
+
+        return (hasSttInStorage || hasSttInAssets) && (hasTtsInStorage || hasTtsInAssets)
+    }
+
+    private fun isAssetFilePresent(assetPath: String): Boolean {
         return try {
-            val assetList = context.assets.list(File(lang.modelAssetPath).parent ?: "")
-            val fileName = File(lang.modelAssetPath).name
-            assetList?.contains(fileName) == true
+            val parent = File(assetPath).parent ?: ""
+            val name = File(assetPath).name
+            context.assets.list(parent)?.contains(name) == true
         } catch (_: Exception) {
             false
         }
     }
 
     private fun getInstalledSize(lang: SupportedLanguage): Long {
-        val modelFile = File(context.filesDir, lang.modelAssetPath)
         var total = 0L
-        if (modelFile.exists()) total += modelFile.length()
-        
-        val vocabFile = File(context.filesDir, lang.vocabOrTokensAssetPath)
-        if (vocabFile.exists()) total += vocabFile.length()
+
+        val sttModel = File(context.filesDir, lang.modelAssetPath)
+        if (sttModel.exists()) total += sttModel.length()
+
+        val sttVocab = File(context.filesDir, lang.vocabOrTokensAssetPath)
+        if (sttVocab.exists()) total += sttVocab.length()
+
+        val ttsVoice = TtsVoiceConfig.getConfigFor(lang)
+        val ttsDir = File(context.filesDir, ttsVoice.modelDirName)
+        if (ttsDir.exists()) {
+            ttsDir.walkTopDown().forEach { f ->
+                if (f.isFile) total += f.length()
+            }
+        }
 
         return total
     }
@@ -250,8 +278,9 @@ class LanguagePackManager private constructor(private val context: Context) {
     }
 
     /**
-     * Removes an installed language pack from filesDir.
+     * Removes an installed language pack (both STT and TTS models) from filesDir.
      * Prevents removing the currently active language pack.
+     * Preserves shared phoneme data (`tts-en-amy/espeak-ng-data`).
      */
     suspend fun removePack(
         lang: SupportedLanguage,
@@ -264,15 +293,22 @@ class LanguagePackManager private constructor(private val context: Context) {
         }
 
         try {
-            val modelFile = File(context.filesDir, lang.modelAssetPath)
-            if (modelFile.exists()) modelFile.delete()
+            // Delete STT model & vocab
+            val sttModel = File(context.filesDir, lang.modelAssetPath)
+            if (sttModel.exists()) sttModel.delete()
 
-            val vocabFile = File(context.filesDir, lang.vocabOrTokensAssetPath)
-            if (vocabFile.exists()) vocabFile.delete()
+            val sttVocab = File(context.filesDir, lang.vocabOrTokensAssetPath)
+            if (sttVocab.exists()) sttVocab.delete()
 
+            // Delete TTS model folder
             val ttsVoice = TtsVoiceConfig.getConfigFor(lang)
             val ttsDir = File(context.filesDir, ttsVoice.modelDirName)
-            if (ttsDir.exists()) ttsDir.deleteRecursively()
+            if (ttsDir.exists()) {
+                // Delete model.onnx, tokens.txt, and model.onnx.json inside voice folder
+                File(ttsDir, "model.onnx").delete()
+                File(ttsDir, "tokens.txt").delete()
+                File(ttsDir, "model.onnx.json").delete()
+            }
 
             refreshStatuses()
             Log.i(TAG, "Removed language pack for ${lang.displayName}")

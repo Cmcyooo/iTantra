@@ -81,7 +81,10 @@ android {
         compose = true
     }
     androidResources {
-        // ONNX assets compressed for reduced APK size
+        // Exclude heavy language pack model files from Base APK so Base APK is small (~95 MB).
+        // Language packs are downloaded or imported on demand via LanguagePackManager.
+        // AAPT pattern checks exact filenames (colon-separated, no wildcards).
+        ignoreAssetsPattern = "vakyansh_gujarati_base.int8.onnx:vakyansh_hindi_base.int8.onnx:vakyansh_kannada_base.int8.onnx:vakyansh_telugu_base.int8.onnx:encoder.onnx:decoder.onnx:model.onnx"
     }
     packaging {
         resources {
