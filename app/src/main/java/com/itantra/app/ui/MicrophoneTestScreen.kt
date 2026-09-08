@@ -1370,6 +1370,7 @@ fun LanguageSelectorSection(
     ttsManager: com.itantra.app.audio.TtsManager,
     audioManager: com.itantra.app.audio.AudioCaptureManager? = null
 ) {
+    val context = LocalContext.current
     val currentLang by languageModelManager.currentLanguage.collectAsState()
     val lifecycleState by languageModelManager.lifecycleState.collectAsState()
     val ttsLifecycleState by ttsManager.languageTtsManager.lifecycleState.collectAsState()
@@ -1381,22 +1382,74 @@ fun LanguageSelectorSection(
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
     var showManualPickerForPending by remember { mutableStateOf(false) }
+    var showPackDialog by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    val packManager = remember { LanguagePackManager.getInstance(context) }
+    val packStatuses by packManager.packStatuses.collectAsState()
+    val installedPacksCount = packStatuses.values.count { it.isInstalled }
+
+    Column {
+        if (installedPacksCount <= 1) {
+            // First-launch onboarding banner
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
             ) {
-                Text(
-                    text = "Speech & TTS Language",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("📦 Choose Language Packs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text("Install offline language models for Hindi, Gujarati, Telugu, Kannada & more.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = { showPackDialog = true }) {
+                        Text("SETUP")
+                    }
+                }
+            }
+        }
+
+        if (showPackDialog) {
+            LanguagePackManagementDialog(
+                packManager = packManager,
+                activeLanguage = currentLang,
+                onDismiss = { showPackDialog = false }
+            )
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Speech & TTS Language",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = { showPackDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Packs", fontSize = 11.sp)
+                    }
+                }
 
                 val isLoading = lifecycleState == ModelLifecycleState.LOADING || 
                                 lifecycleState == ModelLifecycleState.RELEASING ||

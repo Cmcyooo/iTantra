@@ -1,21 +1,28 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+local.properties
+/.idea/
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-
-.idea/
 gradle/gradle-daemon-jvm.properties
+
+# Keystores and signing secrets
+*.jks
+*.keystore
+*.p12
+*.pem
+release.properties
+signing.properties
+
+# Local wave recordings and debug files
+*.wav
+debug_stt_capture.wav
+phase12b_stt_capture.wav
+phase12b_redmi_live.png
 
 # Benchmark data and models
 benchmarks/**/data/
@@ -23,3 +30,9 @@ benchmarks/**/models/
 benchmarks/**/*.wav
 benchmarks/**/*.onnx
 benchmarks/**/*.tar.bz2
+
+# Generated/local runtime files
+.kotlin/
+hs_err_pid*.log
+replay_pid*.log
+release_language_packs/

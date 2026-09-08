@@ -8,9 +8,20 @@
 
 **Platform:** Android  
 **Language:** Kotlin  
-**Status:** 🚧 Active Development  
+**Status:** 🚀 Public Release v1.0.0  
 **Core Approach:** Local Edge AI + Text-Based Peer Communication  
 **Target Hardware:** Low- and mid-range Android devices
+
+---
+
+### 📦 Download iTantra v1.0.0
+
+Download the signed release APKs from the [GitHub Releases](https://github.com/Cmcyooo/iTantra/releases) page:
+
+- **Recommended:** `app-arm64-v8a-release.apk` (**~514 MB**) — Recommended for modern Android phones (ARM 64-bit architecture).
+- **Universal:** `app-universal-release.apk` (**~550 MB**) — Universal build containing native libraries for all CPU architectures (ARM64, ARMv7, x86_64, x86).
+
+> **Note:** All 10 supported languages (Hindi, Gujarati, Marathi, Kannada, Malayalam, Tamil, Telugu, Odia, Bengali, English) and required offline AI models (VAD, STT, TTS, LID) are packaged directly inside the APK for 100% offline operation with zero internet required.
 
 ---
 

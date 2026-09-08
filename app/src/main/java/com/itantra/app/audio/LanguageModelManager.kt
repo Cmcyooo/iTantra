@@ -376,7 +376,16 @@ class LanguageModelManager(
         }
         activeEngine = null
 
-        // 2. Instantiate and initialize new engine
+        // 2. Check if Language Pack is installed
+        val packManager = LanguagePackManager.getInstance(context)
+        if (!packManager.isPackInstalled(targetLanguage)) {
+            val errMsg = "Language pack for ${targetLanguage.displayName} (${targetLanguage.nativeName}) is not installed. Download or import it from Language Packs."
+            Log.e(TAG, errMsg)
+            _lifecycleState.value = ModelLifecycleState.FAILED
+            return Result.failure(IllegalStateException(errMsg))
+        }
+
+        // 3. Instantiate and initialize new engine
         _lifecycleState.value = ModelLifecycleState.LOADING
         return try {
             val engine = if (targetLanguage == SupportedLanguage.ENGLISH) {
